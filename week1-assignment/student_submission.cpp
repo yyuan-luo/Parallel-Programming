@@ -62,11 +62,11 @@ void shift_rows() {
 void multiply_with_polynomial(int column) {
     for (int row = 0; row < MESSAGE_BLOCK_SIZE; ++row) {
         int result = 0;
-        for (int degree = MESSAGE_BLOCK_SIZE - 1; degree >= row; --degree) {
-            result += polynomialCoefficients[row][degree] * m_tmp[MESSAGE_BLOCK_SIZE - 1 - degree];
+        for (int degree = MESSAGE_BLOCK_SIZE-1; degree >= row; --degree) {
+            result += polynomialCoefficients[row][degree] * m_tmp[MESSAGE_BLOCK_SIZE-1-degree];
         }
         for (int degree = 0; degree < row; ++degree) {
-            result += polynomialCoefficients[row][degree] * power(message[degree][column], degree + 1);
+            result += polynomialCoefficients[row][degree] * power(message[degree][column], degree+1);
         }
         message[row][column] = result;
     }
@@ -79,7 +79,7 @@ void multiply_with_polynomial(int column) {
 void mix_columns() {
     for (int column = 0; column < MESSAGE_BLOCK_SIZE; ++column) {
         for (int degree = 0; degree < MESSAGE_BLOCK_SIZE; ++degree)
-            m_tmp[degree] = power(message[MESSAGE_BLOCK_SIZE - 1 - degree][column], MESSAGE_BLOCK_SIZE - degree);
+            m_tmp[degree] = power(message[MESSAGE_BLOCK_SIZE-1-degree][column], MESSAGE_BLOCK_SIZE-degree);
         multiply_with_polynomial(column);
     }
 }
@@ -100,15 +100,6 @@ void add_key() {
  * Your main encryption routine.
  */
 int main() {
-//    mix_columns();
-//    for (int i = 0; i < MESSAGE_BLOCK_SIZE; ++i) {
-//        for (int j = 0; j < MESSAGE_BLOCK_SIZE; ++j) {
-//            std::cout << message[i][j] << " ";
-//        }
-//        std::cout << std::endl;
-//    }
-//    return 0;
-
     for (unsigned int i = 0; i < UNIQUE_CHARACTERS; ++i) {
         unsigned int key = originalCharacter[i];
         dict[key] = substitutedCharacter[i];
