@@ -1,6 +1,5 @@
 #include <cstring>
 #include <iostream>
-#include <time.h>
 #include "vv-aes.h"
 
 #define MOD 1000000007
