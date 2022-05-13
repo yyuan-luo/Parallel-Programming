@@ -43,6 +43,22 @@ struct Vector3 {
     Vector3 operator/=(const float& s) { return *this *= 1/s; }
 };
 
+struct Checksum {
+    uint32_t r, g, b;
+
+    Checksum() : r{0}, g{0}, b{0} {}
+    Checksum(uint32_t rr, uint32_t gg, uint32_t bb) : r(rr), g(gg), b(bb) {}
+
+    Checksum operator+(const Checksum& v) const { return Checksum(this->r + v.r, this->b + v.b, this->g + v.g); }
+
+    Checksum operator+=(const Checksum& v) {
+        this->r += v.r;
+        this->g += v.g;
+        this->b += v.b;
+        return *this;
+    }
+};
+
 inline float dot(const Vector3& a, const Vector3& b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
 inline Vector3 cross(const Vector3& a, const Vector3& b) { return Vector3(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x); }
 inline float length(const Vector3& vec3) { return std::sqrt(vec3.x * vec3.x + vec3.y * vec3.y + vec3.z * vec3.z); }

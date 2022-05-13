@@ -12,7 +12,7 @@
 #define DEPTH 64
 #define NUM_SPHERES 16
 
-Color write_color(Vector3 &checksum, Vector3 pixel_color, int samples_per_pixel) {
+Color write_color(Checksum &checksum, Vector3 pixel_color, int samples_per_pixel) {
     auto r = pixel_color.x;
     auto g = pixel_color.y;
     auto b = pixel_color.z;
@@ -28,9 +28,9 @@ Color write_color(Vector3 &checksum, Vector3 pixel_color, int samples_per_pixel)
     int pixel_g = static_cast<int>(256 * clamp(g, 0.0, 0.999));
     int pixel_b = static_cast<int>(256 * clamp(b, 0.0, 0.999));
 
-    checksum.x += pixel_r;
-    checksum.y += pixel_g;
-    checksum.z += pixel_b;
+    checksum.r += pixel_r;
+    checksum.g += pixel_g;
+    checksum.b += pixel_b;
 
     return {pixel_r, pixel_g, pixel_b};
 }
@@ -110,6 +110,7 @@ bool sphere_hit(const Sphere& sphere, const Ray& ray, float t_min, float t_max, 
 }
 
 void readInput() {
+    std::cout << "Assignment VERSION 2. Please update from Gitlab if your code doesn't output this." << std::endl;
     std::cout << "READY" << std::endl;
     unsigned int seed = 0;
     std::cin >> seed;
@@ -123,13 +124,13 @@ void readInput() {
     srand(seed);
 }
 
-void writeOutput(Vector3 checksum) {
-	std::cout<< "red checksum is : "<< checksum.x <<std::endl;
-	std::cout<< "green checksum is : "<< checksum.y <<std::endl;
- 	std::cout<< "blue checksum is : "<< checksum.z <<std::endl;	 
+void writeOutput(Checksum checksum) {
+    std::cout<< "red checksum is : "<< (double) checksum.r <<std::endl;
+    std::cout<< "green checksum is : "<< (double) checksum.g <<std::endl;
+    std::cout<< "blue checksum is : "<< (double) checksum.b <<std::endl;
 
-	// This stops the timer.
-	std::cout << std::endl << "DONE" << std::endl;
+    // This stops the timer.
+    std::cout << std::endl << "DONE" << std::endl;
 }
 
 void create_random_scene(std::vector<Sphere>& spheres) {
