@@ -10,7 +10,6 @@
 int width_interval = 80;
 int height_interval = 360;
 int interval = 40;
-int task_id;
 
 std::thread threads[THREAD_NUM];
 std::mutex mutex;
@@ -80,8 +79,8 @@ working_thread(int thread_id, const std::vector <Sphere> &spheres, int *image_da
     const auto aspect_ratio = (float) WIDTH / HEIGHT;
     Camera camera(Vector3(0, 1, 1), Vector3(0, 0, -1), Vector3(0, 1, 0), aspect_ratio, 90, 0.0f, 1.5f);
 
-    for (int y = (1 + thread_id / 16) * height_interval - 1; y >= (thread_id / 16) * height_interval; y--) {
-        for (int x = width_interval * (thread_id % 16); x < width_interval * (thread_id % 16 + 1); x++) {
+    for (int y = 0; y < HEIGHT; ++y) {
+        for (int x = interval * thread_id; x < interval * (thread_id + 1); x++) {
             Vector3 pixel_color(0, 0, 0);
             for (int s = 0; s < NUM_SAMPLES; s++) {
                 auto u = (float) (x + random_float()) / (WIDTH - 1);
@@ -89,6 +88,7 @@ working_thread(int thread_id, const std::vector <Sphere> &spheres, int *image_da
                 auto r = get_camera_ray(camera, u, v);
                 pixel_color += trace_ray(r, spheres, DEPTH);
             }
+
             mutex.lock();
             auto output_color = write_color(checksum, pixel_color, NUM_SAMPLES);
             mutex.unlock();
