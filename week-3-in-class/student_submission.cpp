@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <math.h>
+#include <omp.h>
 
 // uncomment this line to print used time
 // comment this line before submission
@@ -14,10 +15,12 @@ void predict(double input_data[][2], int *predicted_class, int *each_class_num)
 {
     int k_nearest_neighbors[NUM_PREDICTIONS][K];
 
+    #pragma omp parallel for schedule(dynamic)
     for(int i = 0; i < NUM_PREDICTIONS; i++)
     {
         get_k_nearest_neighbors(input_data[i], k_nearest_neighbors[i]);
         get_class_from_neighbors(k_nearest_neighbors[i], &predicted_class[i]);
+        #pragma omp atomic
         each_class_num[predicted_class[i]]++;
     }
 }
