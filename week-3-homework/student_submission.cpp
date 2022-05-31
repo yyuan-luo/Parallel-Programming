@@ -29,7 +29,11 @@ int mandelbrot_draw(int x_resolution, int y_resolution, int max_iter,
     int pointsInSetCount = 0;
 
 // For each pixel in the image
+<<<<<<< HEAD
 #pragma omp parallel for collapse(2) schedule(static, 7000) num_threads(32)
+=======
+#pragma omp parallel for schedule(dynamic) reduction(+: pointsInSetCount)
+>>>>>>> ea6addcb471fa25519ecfbc60a469cd998976e93
         for (int i = 0; i < y_resolution; i++)
             for (int j = 0; j < x_resolution; j++)
             {
@@ -44,18 +48,28 @@ int mandelbrot_draw(int x_resolution, int y_resolution, int max_iter,
 
                 // Apply the Mandelbrot calculation until the absolute value >= 2 (meaning the calculation will diverge to
                 // infinity) or the maximum number of iterations was reached.
-                do
+                // double dist;
+                // do
+                // {
+                //     Z = std::pow(Z, power) + C;
+                //     dist = Z.real() * Z.real() + Z.imag() * Z.imag();
+                //     k++;
+                // } while (dist < 4.0 && k < max_iter);
+
+                for (k = 1;k < max_iter;k++)
                 {
                     Z = std::pow(Z, power) + C;
-                    k++;
-                } while (std::abs(Z) < 2 && k < max_iter);
+                    double dist = Z.real() * Z.real() + Z.imag() * Z.imag();
+                    if (dist >= 4.0)
+                        break;
+                }
+                
 
                 // If the maximum number of iterations was reached then this point is in the Mandelbrot set and we color it
                 // black. Else, it is outside and we color it with a color that corresponds to how many iterations there
                 // were before we confirmed the divergence.
                 if (k == max_iter)
                 {
-#pragma omp atomic
                     pointsInSetCount++;
                 }
 
