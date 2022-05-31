@@ -29,9 +29,7 @@ int mandelbrot_draw(int x_resolution, int y_resolution, int max_iter,
     int pointsInSetCount = 0;
 
 // For each pixel in the image
-#pragma omp parallel num_threads(32)
-    {
-#pragma omp for collapse(2) schedule(static, 7000)
+#pragma omp parallel for collapse(2) schedule(static, 7000) num_threads(32)
         for (int i = 0; i < y_resolution; i++)
             for (int j = 0; j < x_resolution; j++)
             {
@@ -74,7 +72,6 @@ int mandelbrot_draw(int x_resolution, int y_resolution, int max_iter,
                     }
                 }
             }
-    }
 
     return pointsInSetCount;
 }
