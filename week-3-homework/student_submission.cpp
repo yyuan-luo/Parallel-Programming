@@ -52,7 +52,7 @@ int mandelbrot_draw(int x_resolution, int y_resolution, int max_iter,
                 //     k++;
                 // } while (dist < 4.0 && k < max_iter);
 
-                for (k = 1;k < max_iter;k++)
+                for (k = 0;k < max_iter-1;k++)
                 {
                     Z = std::pow(Z, power) + C;
                     double dist = Z.real() * Z.real() + Z.imag() * Z.imag();
@@ -64,7 +64,7 @@ int mandelbrot_draw(int x_resolution, int y_resolution, int max_iter,
                 // If the maximum number of iterations was reached then this point is in the Mandelbrot set and we color it
                 // black. Else, it is outside and we color it with a color that corresponds to how many iterations there
                 // were before we confirmed the divergence.
-                if (k == max_iter)
+                if (k == max_iter-1)
                 {
                     pointsInSetCount++;
                 }
