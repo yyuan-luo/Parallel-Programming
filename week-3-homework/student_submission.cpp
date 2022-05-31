@@ -44,11 +44,22 @@ int mandelbrot_draw(int x_resolution, int y_resolution, int max_iter,
 
                 // Apply the Mandelbrot calculation until the absolute value >= 2 (meaning the calculation will diverge to
                 // infinity) or the maximum number of iterations was reached.
-                do
+                // double dist;
+                // do
+                // {
+                //     Z = std::pow(Z, power) + C;
+                //     dist = Z.real() * Z.real() + Z.imag() * Z.imag();
+                //     k++;
+                // } while (dist < 4.0 && k < max_iter);
+
+                for (k = 1;k < max_iter;k++)
                 {
                     Z = std::pow(Z, power) + C;
-                    k++;
-                } while (std::abs(Z) < 2 && k < max_iter);
+                    double dist = Z.real() * Z.real() + Z.imag() * Z.imag();
+                    if (dist >= 4.0)
+                        break;
+                }
+                
 
                 // If the maximum number of iterations was reached then this point is in the Mandelbrot set and we color it
                 // black. Else, it is outside and we color it with a color that corresponds to how many iterations there
