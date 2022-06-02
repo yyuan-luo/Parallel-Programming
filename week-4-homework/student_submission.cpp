@@ -15,47 +15,49 @@ void simulate_waves(ProblemData &problemData) {
     float (&lastWaveIntensity)[MAP_SIZE][MAP_SIZE] = *problemData.lastWaveIntensity;
     float (&currentWaveIntensity)[MAP_SIZE][MAP_SIZE] = *problemData.currentWaveIntensity;
 
-    for (int x = 1; x < MAP_SIZE - 1; ++x) {
-        for (int y = 1; y < MAP_SIZE - 1; ++y) {
+#pragma omp parallel for schedule(dynamic)
+        for (int x = 1; x < MAP_SIZE - 1; ++x) {
+            for (int y = 1; y < MAP_SIZE - 1; ++y) {
 
-            // Simulate some waves
+                // Simulate some waves
 
-            // The acceleration is the relative difference between the current point and the last.
-            float acceleration = lastWaveIntensity[x][y - 1]
-                                 + lastWaveIntensity[x - 1][y]
-                                 + lastWaveIntensity[x + 1][y]
-                                 + lastWaveIntensity[x][y + 1]
-                                 - 4 * lastWaveIntensity[x][y];
+                // The acceleration is the relative difference between the current point and the last.
+                float acceleration = lastWaveIntensity[x][y - 1]
+                                     + lastWaveIntensity[x - 1][y]
+                                     + lastWaveIntensity[x + 1][y]
+                                     + lastWaveIntensity[x][y + 1]
+                                     - 4 * lastWaveIntensity[x][y];
 
-            // The acceleration is multiplied with an attack value, specifying how fast the system can accelerate.
-            acceleration *= ATTACK_FACTOR;
+                // The acceleration is multiplied with an attack value, specifying how fast the system can accelerate.
+                acceleration *= ATTACK_FACTOR;
 
-            // The last_velocity is calculated from the difference between the last intensity and the
-            // second to last intensity
-            float last_velocity = lastWaveIntensity[x][y] - secondLastWaveIntensity[x][y];
+                // The last_velocity is calculated from the difference between the last intensity and the
+                // second to last intensity
+                float last_velocity = lastWaveIntensity[x][y] - secondLastWaveIntensity[x][y];
 
-            // energy preserved takes into account that storms lose energy to their environments over time. The
-            // ratio of energy preserved is higher on open water, lower close to the shore and 0 on land.
-            float energyPreserved = std::clamp(
-                    ENERGY_PRESERVATION_FACTOR * (LAND_THRESHOLD - 0.1f * islandMap[x][y]), 0.0f, 1.0f);
+                // energy preserved takes into account that storms lose energy to their environments over time. The
+                // ratio of energy preserved is higher on open water, lower close to the shore and 0 on land.
+                float energyPreserved = std::clamp(
+                        ENERGY_PRESERVATION_FACTOR * (LAND_THRESHOLD - 0.1f * islandMap[x][y]), 0.0f, 1.0f);
 
-            // There aren't any waves on land.
-            if (islandMap[x][y] >= LAND_THRESHOLD) {
-                currentWaveIntensity[x][y] = 0.0f;
-            } else {
-                currentWaveIntensity[x][y] =
-                        std::clamp(lastWaveIntensity[x][y] + (last_velocity + acceleration) * energyPreserved, 0.0f, 1.0f);
+                // There aren't any waves on land.
+                if (islandMap[x][y] >= LAND_THRESHOLD) {
+                    currentWaveIntensity[x][y] = 0.0f;
+                } else {
+                    currentWaveIntensity[x][y] =
+                            std::clamp(lastWaveIntensity[x][y] + (last_velocity + acceleration) * energyPreserved, 0.0f,
+                                       1.0f);
+                }
             }
         }
-    }
 }
 
 
- // Since all pirates like navigating by the stars, Captain Jack's favorite pathfinding algorithm is called A*.
- // Unfortunately, sometimes you just have to make do with what you have. So here we use a search algorithm that searches
- // the entire domain every time step and calculates all possible ship positions.
+// Since all pirates like navigating by the stars, Captain Jack's favorite pathfinding algorithm is called A*.
+// Unfortunately, sometimes you just have to make do with what you have. So here we use a search algorithm that searches
+// the entire domain every time step and calculates all possible ship positions.
 bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
-                                  std::vector<Position2D> &pathOutput) {
+                                  std::vector <Position2D> &pathOutput) {
     auto &start = problemData.shipOrigin;
     auto &portRoyal = problemData.portRoyal;
     auto &islandMap = problemData.islandMap;
@@ -144,7 +146,7 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
                                 pathTraceback = problemData.nodePredecessors[tracebackTimestep].at(pathTraceback);
                                 tracebackTimestep--;
                             }
-                        } catch (std::out_of_range& e) {
+                        } catch (std::out_of_range &e) {
                             std::cerr << "Path traceback out of range: " << e.what() << std::endl;
                         }
                     }
@@ -164,7 +166,7 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
 }
 
 
- // Your main simulation routine.
+// Your main simulation routine.
 int main(int argc, char *argv[]) {
     bool outputVisualization = false;
     bool constructPathForVisualization = false;
@@ -173,7 +175,7 @@ int main(int argc, char *argv[]) {
 
     //Not interesting for parallelization
     Utility::parse_input(outputVisualization, constructPathForVisualization, numProblems, option, argc, argv);
-    
+
     // Fetch the seed from our container host used to generate the problem. This starts the timer.
     unsigned int seed = Utility::readInput();
 
@@ -191,10 +193,11 @@ int main(int argc, char *argv[]) {
         Utility::generateProblem((seed + problem * JUMP_SIZE) & INT_LIM, *problemData);
 
         std::cerr << "Searching from ship position (" << problemData->shipOrigin.x << ", " << problemData->shipOrigin.y
-                  << ") to Port Royal (" << problemData->portRoyal.x << ", " << problemData->portRoyal.y << ")."<< std::endl;
+                  << ") to Port Royal (" << problemData->portRoyal.x << ", " << problemData->portRoyal.y << ")."
+                  << std::endl;
 
         int pathLength = -1;
-        std::vector<Position2D> path;
+        std::vector <Position2D> path;
 
         for (int t = 2; t < TIME_STEPS; t++) {
             // First simulate all cycles of the storm
