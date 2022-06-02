@@ -15,7 +15,7 @@ void simulate_waves(ProblemData &problemData) {
     float (&lastWaveIntensity)[MAP_SIZE][MAP_SIZE] = *problemData.lastWaveIntensity;
     float (&currentWaveIntensity)[MAP_SIZE][MAP_SIZE] = *problemData.currentWaveIntensity;
 
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static, 32)
         for (int x = 1; x < MAP_SIZE - 1; ++x) {
             for (int y = 1; y < MAP_SIZE - 1; ++y) {
 
@@ -79,8 +79,11 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
     }
 
     // Do the actual path finding.
+    volatile bool flag = false;
+#pragma omp parallel for schedule(dynamic) shared(flag) reduction(+: numPossiblePositions)
     for (int x = 0; x < MAP_SIZE; ++x) {
         for (int y = 0; y < MAP_SIZE; ++y) {
+            if (flag) continue;
             // If there is no possibility to reach this position then we don't need to process it.
             if (!previousShipPositions[x][y]) {
                 continue;
@@ -150,7 +153,7 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
                             std::cerr << "Path traceback out of range: " << e.what() << std::endl;
                         }
                     }
-                    return true;
+                    flag = true;
                 }
 
                 currentShipPositions[neighborPosition.x][neighborPosition.y] = true;
@@ -162,14 +165,14 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
     // are using.
     problemData.numPredecessors += problemData.nodePredecessors[timestep].size();
 
-    return false;
+    return flag;
 }
 
 
 // Your main simulation routine.
 int main(int argc, char *argv[]) {
-    bool outputVisualization = false;
-    bool constructPathForVisualization = false;
+    bool outputVisualization = true;
+    bool constructPathForVisualization = true;
     int numProblems = 1;
     int option;
 
@@ -199,9 +202,10 @@ int main(int argc, char *argv[]) {
         int pathLength = -1;
         std::vector <Position2D> path;
 
+        /** this is not parallelizable due to the implicit data dependency below*/
         for (int t = 2; t < TIME_STEPS; t++) {
             // First simulate all cycles of the storm
-            simulate_waves(*problemData);
+            simulate_waves(*problemData);       // implicit data dependency
 
             // Help captain Sparrow navigate the waves
             if (findPathWithExhaustiveSearch(*problemData, t, path)) {
