@@ -200,31 +200,28 @@ int main(int argc, char *argv[]) {
 
         int pathLength = -1;
         std::vector <Position2D> path;
-#pragma omp task
-        {
-            /** this is not parallelizable due to the implicit data dependency below*/
-            for (int t = 2; t < TIME_STEPS; t++) {
-                // First simulate all cycles of the storm
-                simulate_waves(*problemData);       // implicit data dependency
+        /** this is not parallelizable due to the implicit data dependency below*/
+        for (int t = 2; t < TIME_STEPS; t++) {
+            // First simulate all cycles of the storm
+            simulate_waves(*problemData);       // implicit data dependency
 
-                // Help captain Sparrow navigate the waves
-                if (findPathWithExhaustiveSearch(*problemData, t, path)) {
-                    // The length of the path is one shorter than the time step because the first frame is not part of the
-                    // pathfinding, and the second frame is always the start position.
-                    pathLength = t - 1;
-                }
-
-                if (outputVisualization) {
-                    VideoOutput::writeVideoFrames(path, *problemData);
-                }
-                if (pathLength != -1) {
-                    break;
-                }
-
-                // Rotates the buffers, recycling no longer needed data buffers for writing new data.
-                problemData->flipSearchBuffers();
-                problemData->flipWaveBuffers();
+            // Help captain Sparrow navigate the waves
+            if (findPathWithExhaustiveSearch(*problemData, t, path)) {
+                // The length of the path is one shorter than the time step because the first frame is not part of the
+                // pathfinding, and the second frame is always the start position.
+                pathLength = t - 1;
             }
+
+            if (outputVisualization) {
+                VideoOutput::writeVideoFrames(path, *problemData);
+            }
+            if (pathLength != -1) {
+                break;
+            }
+
+            // Rotates the buffers, recycling no longer needed data buffers for writing new data.
+            problemData->flipSearchBuffers();
+            problemData->flipWaveBuffers();
         }
         // Submit our solution back to the system.
         Utility::writeOutput(pathLength);
