@@ -15,41 +15,41 @@ void simulate_waves(ProblemData &problemData) {
     float (&lastWaveIntensity)[MAP_SIZE][MAP_SIZE] = *problemData.lastWaveIntensity;
     float (&currentWaveIntensity)[MAP_SIZE][MAP_SIZE] = *problemData.currentWaveIntensity;
 
-#pragma omp parallel for schedule(static, 32)
-        for (int x = 1; x < MAP_SIZE - 1; ++x) {
-            for (int y = 1; y < MAP_SIZE - 1; ++y) {
+#pragma omp parallel for schedule(dynamic)
+    for (int x = 1; x < MAP_SIZE - 1; ++x) {
+        for (int y = 1; y < MAP_SIZE - 1; ++y) {
 
-                // Simulate some waves
+            // Simulate some waves
 
-                // The acceleration is the relative difference between the current point and the last.
-                float acceleration = lastWaveIntensity[x][y - 1]
-                                     + lastWaveIntensity[x - 1][y]
-                                     + lastWaveIntensity[x + 1][y]
-                                     + lastWaveIntensity[x][y + 1]
-                                     - 4 * lastWaveIntensity[x][y];
+            // The acceleration is the relative difference between the current point and the last.
+            float acceleration = lastWaveIntensity[x][y - 1]
+                                 + lastWaveIntensity[x - 1][y]
+                                 + lastWaveIntensity[x + 1][y]
+                                 + lastWaveIntensity[x][y + 1]
+                                 - 4 * lastWaveIntensity[x][y];
 
-                // The acceleration is multiplied with an attack value, specifying how fast the system can accelerate.
-                acceleration *= ATTACK_FACTOR;
+            // The acceleration is multiplied with an attack value, specifying how fast the system can accelerate.
+            acceleration *= ATTACK_FACTOR;
 
-                // The last_velocity is calculated from the difference between the last intensity and the
-                // second to last intensity
-                float last_velocity = lastWaveIntensity[x][y] - secondLastWaveIntensity[x][y];
+            // The last_velocity is calculated from the difference between the last intensity and the
+            // second to last intensity
+            float last_velocity = lastWaveIntensity[x][y] - secondLastWaveIntensity[x][y];
 
-                // energy preserved takes into account that storms lose energy to their environments over time. The
-                // ratio of energy preserved is higher on open water, lower close to the shore and 0 on land.
-                float energyPreserved = std::clamp(
-                        ENERGY_PRESERVATION_FACTOR * (LAND_THRESHOLD - 0.1f * islandMap[x][y]), 0.0f, 1.0f);
+            // energy preserved takes into account that storms lose energy to their environments over time. The
+            // ratio of energy preserved is higher on open water, lower close to the shore and 0 on land.
+            float energyPreserved = std::clamp(
+                    ENERGY_PRESERVATION_FACTOR * (LAND_THRESHOLD - 0.1f * islandMap[x][y]), 0.0f, 1.0f);
 
-                // There aren't any waves on land.
-                if (islandMap[x][y] >= LAND_THRESHOLD) {
-                    currentWaveIntensity[x][y] = 0.0f;
-                } else {
-                    currentWaveIntensity[x][y] =
-                            std::clamp(lastWaveIntensity[x][y] + (last_velocity + acceleration) * energyPreserved, 0.0f,
-                                       1.0f);
-                }
+            // There aren't any waves on land.
+            if (islandMap[x][y] >= LAND_THRESHOLD) {
+                currentWaveIntensity[x][y] = 0.0f;
+            } else {
+                currentWaveIntensity[x][y] =
+                        std::clamp(lastWaveIntensity[x][y] + (last_velocity + acceleration) * energyPreserved, 0.0f,
+                                   1.0f);
             }
         }
+    }
 }
 
 
@@ -171,9 +171,9 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
 
 // Your main simulation routine.
 int main(int argc, char *argv[]) {
-    bool outputVisualization = true;
-    bool constructPathForVisualization = true;
-    int numProblems = 1;
+    bool outputVisualization = false;
+    bool constructPathForVisualization = false;
+    int numProblems = 5;
     int option;
 
     //Not interesting for parallelization
@@ -194,36 +194,37 @@ int main(int argc, char *argv[]) {
 
         // Receive the problem from the system.
         Utility::generateProblem((seed + problem * JUMP_SIZE) & INT_LIM, *problemData);
-
         std::cerr << "Searching from ship position (" << problemData->shipOrigin.x << ", " << problemData->shipOrigin.y
                   << ") to Port Royal (" << problemData->portRoyal.x << ", " << problemData->portRoyal.y << ")."
                   << std::endl;
 
         int pathLength = -1;
         std::vector <Position2D> path;
+#pragma omp task
+        {
+            /** this is not parallelizable due to the implicit data dependency below*/
+            for (int t = 2; t < TIME_STEPS; t++) {
+                // First simulate all cycles of the storm
+                simulate_waves(*problemData);       // implicit data dependency
 
-        /** this is not parallelizable due to the implicit data dependency below*/
-        for (int t = 2; t < TIME_STEPS; t++) {
-            // First simulate all cycles of the storm
-            simulate_waves(*problemData);       // implicit data dependency
+                // Help captain Sparrow navigate the waves
+                if (findPathWithExhaustiveSearch(*problemData, t, path)) {
+                    // The length of the path is one shorter than the time step because the first frame is not part of the
+                    // pathfinding, and the second frame is always the start position.
+                    pathLength = t - 1;
+                }
 
-            // Help captain Sparrow navigate the waves
-            if (findPathWithExhaustiveSearch(*problemData, t, path)) {
-                // The length of the path is one shorter than the time step because the first frame is not part of the
-                // pathfinding, and the second frame is always the start position.
-                pathLength = t - 1;
+                if (outputVisualization) {
+                    VideoOutput::writeVideoFrames(path, *problemData);
+                }
+                if (pathLength != -1) {
+                    break;
+                }
+
+                // Rotates the buffers, recycling no longer needed data buffers for writing new data.
+                problemData->flipSearchBuffers();
+                problemData->flipWaveBuffers();
             }
-
-            if (outputVisualization) {
-                VideoOutput::writeVideoFrames(path, *problemData);
-            }
-            if (pathLength != -1) {
-                break;
-            }
-
-            // Rotates the buffers, recycling no longer needed data buffers for writing new data.
-            problemData->flipSearchBuffers();
-            problemData->flipWaveBuffers();
         }
         // Submit our solution back to the system.
         Utility::writeOutput(pathLength);
@@ -236,11 +237,13 @@ int main(int argc, char *argv[]) {
 
         delete problemData;
     }
-    // This stops the timer by printing DONE.
+
+// This stops the timer by printing DONE.
     Utility::stopTimer();
 
     if (outputVisualization) {
         VideoOutput::endVideoOutput();
+
     }
     return 0;
 }
