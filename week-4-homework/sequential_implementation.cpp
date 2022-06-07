@@ -168,7 +168,7 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
 int main(int argc, char *argv[]) {
     bool outputVisualization = false;
     bool constructPathForVisualization = false;
-    int numProblems = 10;
+    int numProblems = 1;
     int option;
 
     //Not interesting for parallelization

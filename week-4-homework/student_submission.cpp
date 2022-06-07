@@ -57,7 +57,7 @@ void simulate_waves(ProblemData &problemData) {
 // Unfortunately, sometimes you just have to make do with what you have. So here we use a search algorithm that searches
 // the entire domain every time step and calculates all possible ship positions.
 bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
-                                  std::vector <Position2D> &pathOutput) {
+                                  std::vector <Position2D> &pathOutput, std::queue<Position2D> &q) {
     auto &start = problemData.shipOrigin;
     auto &portRoyal = problemData.portRoyal;
     auto &islandMap = problemData.islandMap;
@@ -66,29 +66,14 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
     int numPossiblePositions = 0;
 
     bool (&currentShipPositions)[MAP_SIZE][MAP_SIZE] = *problemData.currentShipPositions;
-    bool (&previousShipPositions)[MAP_SIZE][MAP_SIZE] = *problemData.previousShipPositions;
 
     // We could always have been at the start in the previous frame since we get to choose when we start our journey.
-    previousShipPositions[start.x][start.y] = true;
-
-    // Ensure that our new buffer is set to zero. We need to ensure this because we are reusing previously used buffers.
-    for (int x = 0; x < MAP_SIZE; ++x) {
-        for (int y = 0; y < MAP_SIZE; ++y) {
-            currentShipPositions[x][y] = false;
-        }
-    }
+    if (q.empty())
+        q.push(Position2D(start.x, start.y));
 
     // Do the actual path finding.
-    volatile bool flag = false;
-#pragma omp parallel for schedule(dynamic) shared(flag) reduction(+: numPossiblePositions)
-    for (int x = 0; x < MAP_SIZE; ++x) {
-        for (int y = 0; y < MAP_SIZE; ++y) {
-            if (flag) continue;
-            // If there is no possibility to reach this position then we don't need to process it.
-            if (!previousShipPositions[x][y]) {
-                continue;
-            }
-            Position2D previousPosition(x, y);
+    for (int i = 0; i < q.size(); ++i) {
+            Position2D previousPosition(q.front());
 
             // The Jolly Mon (Jack's ship) is not very versatile. It can only move along the four cardinal directions by one
             // square each and along their diagonals. Alternatively, it can just try to stay where it is.
@@ -149,23 +134,22 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
                                 pathTraceback = problemData.nodePredecessors[tracebackTimestep].at(pathTraceback);
                                 tracebackTimestep--;
                             }
-                        } catch (std::out_of_range &e) {
+                        } catch (std::out_of_range& e) {
                             std::cerr << "Path traceback out of range: " << e.what() << std::endl;
                         }
                     }
-                    flag = true;
+                    return true;
                 }
 
                 currentShipPositions[neighborPosition.x][neighborPosition.y] = true;
+                q.push(Position2D(neighborPosition.x, neighborPosition.y));
                 numPossiblePositions++;
+                q.pop();
             }
-        }
     }
     // This is not strictly required but can be used to track how much additional memory our path traceback structures
     // are using.
     problemData.numPredecessors += problemData.nodePredecessors[timestep].size();
-
-    return flag;
 }
 
 
@@ -173,7 +157,7 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
 int main(int argc, char *argv[]) {
     bool outputVisualization = false;
     bool constructPathForVisualization = false;
-    int numProblems = 5;
+    int numProblems = 1;
     int option;
 
     //Not interesting for parallelization
@@ -193,24 +177,27 @@ int main(int argc, char *argv[]) {
         problemData->constructPathForVisualization = constructPathForVisualization;
 
         // Receive the problem from the system.
+        /** there is a implicit data dependency between rand() inside generateProblem */
         Utility::generateProblem((seed + problem * JUMP_SIZE) & INT_LIM, *problemData);
         std::cerr << "Searching from ship position (" << problemData->shipOrigin.x << ", " << problemData->shipOrigin.y
                   << ") to Port Royal (" << problemData->portRoyal.x << ", " << problemData->portRoyal.y << ")."
                   << std::endl;
 
-        int pathLength = -1;
+        int pathLength = 1000000;
         std::vector <Position2D> path;
-        /** this is not parallelizable due to the implicit data dependency below*/
+        std::queue <Position2D> q;
+        /** this is not parallelizable due to the implicit data dependency of problemData*/
         for (int t = 2; t < TIME_STEPS; t++) {
             // First simulate all cycles of the storm
-            simulate_waves(*problemData);       // implicit data dependency
 
-            // Help captain Sparrow navigate the waves
-            if (findPathWithExhaustiveSearch(*problemData, t, path)) {
-                // The length of the path is one shorter than the time step because the first frame is not part of the
-                // pathfinding, and the second frame is always the start position.
-                pathLength = t - 1;
-            }
+                simulate_waves(*problemData);       // implicit data dependency
+
+                // Help captain Sparrow navigate the waves
+                if (findPathWithExhaustiveSearch(*problemData, t, path, q)) {
+                    // The length of the path is one shorter than the time step because the first frame is not part of the
+                    // pathfinding, and the second frame is always the start position.
+                    pathLength = t - 1;
+                }
 
             if (outputVisualization) {
                 VideoOutput::writeVideoFrames(path, *problemData);
@@ -220,7 +207,6 @@ int main(int argc, char *argv[]) {
             }
 
             // Rotates the buffers, recycling no longer needed data buffers for writing new data.
-            problemData->flipSearchBuffers();
             problemData->flipWaveBuffers();
         }
         // Submit our solution back to the system.
