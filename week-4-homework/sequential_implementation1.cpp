@@ -44,7 +44,8 @@ void simulate_waves(ProblemData &problemData) {
                 currentWaveIntensity[x][y] = 0.0f;
             } else {
                 currentWaveIntensity[x][y] =
-                        std::clamp(lastWaveIntensity[x][y] + (last_velocity + acceleration) * energyPreserved, 0.0f, 1.0f);
+                        std::clamp(lastWaveIntensity[x][y] + (last_velocity + acceleration) * energyPreserved, 0.0f,
+                                   1.0f);
             }
         }
     }
@@ -55,7 +56,7 @@ void simulate_waves(ProblemData &problemData) {
 // Unfortunately, sometimes you just have to make do with what you have. So here we use a search algorithm that searches
 // the entire domain every time step and calculates all possible ship positions.
 bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
-                                  std::vector<Position2D> &pathOutput, std::queue<Position2D> &q) {
+                                  std::vector <Position2D> &pathOutput, std::queue <Position2D> &q) {
     auto &start = problemData.shipOrigin;
     auto &portRoyal = problemData.portRoyal;
     auto &islandMap = problemData.islandMap;
@@ -67,9 +68,9 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
     bool (&previousShipPositions)[MAP_SIZE][MAP_SIZE] = *problemData.previousShipPositions;
 
     // We could always have been at the start in the previous frame since we get to choose when we start our journey.
-    previousShipPositions[start.x][start.y] = true;
     if (q.empty())
         q.push(Position2D(start.x, start.y));
+    currentShipPositions[start.x][start.y] = true;
 
     // Ensure that our new buffer is set to zero. We need to ensure this because we are reusing previously used buffers.
 
@@ -115,8 +116,10 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
 
             // If we reach Port Royal, we win.
             if (neighborPosition == portRoyal) {
+//                printf("porRoyal reached\n");
                 return true;
             }
+//            printf("(%d, %d)\n", neighborPosition.x, neighborPosition.y);
             currentShipPositions[neighborPosition.x][neighborPosition.y] = true;
             q.push(neighborPosition);
             numPossiblePositions++;
@@ -158,11 +161,12 @@ int main(int argc, char *argv[]) {
         Utility::generateProblem((seed + problem * JUMP_SIZE) & INT_LIM, *problemData);
 
         std::cerr << "Searching from ship position (" << problemData->shipOrigin.x << ", " << problemData->shipOrigin.y
-                  << ") to Port Royal (" << problemData->portRoyal.x << ", " << problemData->portRoyal.y << ")."<< std::endl;
+                  << ") to Port Royal (" << problemData->portRoyal.x << ", " << problemData->portRoyal.y << ")."
+                  << std::endl;
 
         int pathLength = -1;
-        std::vector<Position2D> path;
-        std::queue<Position2D> q;
+        std::vector <Position2D> path;
+        std::queue <Position2D> q;
 
         for (int t = 2; t < TIME_STEPS; t++) {
             // First simulate all cycles of the storm

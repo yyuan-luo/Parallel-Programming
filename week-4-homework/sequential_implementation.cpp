@@ -122,6 +122,7 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
 
                 // If we reach Port Royal, we win.
                 if (neighborPosition == portRoyal) {
+//                    printf("porRoyal reached\n");
                     if (problemData.outputVisualization) {
                         // We flip the search buffer back to the previous one to prevent drawing a half finished buffer
                         // to screen (purely aesthetic).
@@ -150,7 +151,7 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
                     }
                     return true;
                 }
-
+//                printf("(%d, %d)\n", neighborPosition.x, neighborPosition.y);
                 currentShipPositions[neighborPosition.x][neighborPosition.y] = true;
                 numPossiblePositions++;
             }
