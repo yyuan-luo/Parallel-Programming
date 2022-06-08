@@ -51,11 +51,11 @@ void simulate_waves(ProblemData &problemData) {
 }
 
 
- // Since all pirates like navigating by the stars, Captain Jack's favorite pathfinding algorithm is called A*.
- // Unfortunately, sometimes you just have to make do with what you have. So here we use a search algorithm that searches
- // the entire domain every time step and calculates all possible ship positions.
+// Since all pirates like navigating by the stars, Captain Jack's favorite pathfinding algorithm is called A*.
+// Unfortunately, sometimes you just have to make do with what you have. So here we use a search algorithm that searches
+// the entire domain every time step and calculates all possible ship positions.
 bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
-                                  std::vector<Position2D> &pathOutput) {
+                                  std::vector<Position2D> &pathOutput, std::queue<Position2D> &q) {
     auto &start = problemData.shipOrigin;
     auto &portRoyal = problemData.portRoyal;
     auto &islandMap = problemData.islandMap;
@@ -68,93 +68,60 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
 
     // We could always have been at the start in the previous frame since we get to choose when we start our journey.
     previousShipPositions[start.x][start.y] = true;
+    if (q.empty())
+        q.push(Position2D(start.x, start.y));
 
     // Ensure that our new buffer is set to zero. We need to ensure this because we are reusing previously used buffers.
-    for (int x = 0; x < MAP_SIZE; ++x) {
-        for (int y = 0; y < MAP_SIZE; ++y) {
-            currentShipPositions[x][y] = false;
-        }
-    }
 
     // Do the actual path finding.
-    for (int x = 0; x < MAP_SIZE; ++x) {
-        for (int y = 0; y < MAP_SIZE; ++y) {
-            // If there is no possibility to reach this position then we don't need to process it.
-            if (!previousShipPositions[x][y]) {
+    for (int i = 0; i < q.size(); ++i) {
+        // If there is no possibility to reach this position then we don't need to process it.
+        Position2D previousPosition(q.front().x, q.front().y);
+
+        // The Jolly Mon (Jack's ship) is not very versatile. It can only move along the four cardinal directions by one
+        // square each and along their diagonals. Alternatively, it can just try to stay where it is.
+        // If we are not yet done then we have to take a look at our neighbors.
+        for (Position2D &neighbor: neighbours) {
+            // Get the neighboring position we are examining. It is one step further in time since we have to move
+            // there first.
+            Position2D neighborPosition = previousPosition + neighbor;
+
+            // If position is out of bounds, skip it
+            if (neighborPosition.x < 0 || neighborPosition.y < 0
+                || neighborPosition.x >= MAP_SIZE || neighborPosition.y >= MAP_SIZE) {
                 continue;
             }
-            Position2D previousPosition(x, y);
 
-            // The Jolly Mon (Jack's ship) is not very versatile. It can only move along the four cardinal directions by one
-            // square each and along their diagonals. Alternatively, it can just try to stay where it is.
-            // If we are not yet done then we have to take a look at our neighbors.
-            for (Position2D &neighbor: neighbours) {
-                // Get the neighboring position we are examining. It is one step further in time since we have to move
-                // there first.
-                Position2D neighborPosition = previousPosition + neighbor;
-
-                // If position is out of bounds, skip it
-                if (neighborPosition.x < 0 || neighborPosition.y < 0
-                    || neighborPosition.x >= MAP_SIZE || neighborPosition.y >= MAP_SIZE) {
-                    continue;
-                }
-
-                // If this position is already marked, skip it
-                if (currentShipPositions[neighborPosition.x][neighborPosition.y]) {
-                    continue;
-                }
-
-                // If we can't sail to this position because it is either on land or because the wave height is too
-                // great for the Jolly Mon to handle, skip it
-                if (islandMap[neighborPosition.x][neighborPosition.y] >= LAND_THRESHOLD ||
-                    currentWaveIntensity[neighborPosition.x][neighborPosition.y] >= SHIP_THRESHOLD) {
-                    continue;
-                }
-
-                if (problemData.constructPathForVisualization) {
-                    // Add the previous node as the method we used to get here. This is only needed to draw the path for
-                    // the output visualization.
-                    if (neighborPosition.distanceTo(portRoyal) <= TIME_STEPS - timestep) {
-                        Position2D &predecessor = problemData.nodePredecessors[timestep][neighborPosition];
-                        predecessor = previousPosition;
-                    }
-                }
-
-                // If we reach Port Royal, we win.
-                if (neighborPosition == portRoyal) {
-                    if (problemData.outputVisualization) {
-                        // We flip the search buffer back to the previous one to prevent drawing a half finished buffer
-                        // to screen (purely aesthetic).
-                        problemData.flipSearchBuffers();
-                    }
-                    if (problemData.constructPathForVisualization) {
-                        try {
-                            // Trace back our path from the end to the beginning. This is just used to draw a path into
-                            // the output video
-                            Position2D pathTraceback = neighborPosition;
-                            pathOutput.resize(timestep + 1);
-                            int tracebackTimestep = timestep;
-                            while (pathTraceback != start) {
-                                if (tracebackTimestep <= 0) {
-                                    std::cerr << "Traceback did not lead back to origin before timestep 0!"
-                                              << std::endl;
-                                    break;
-                                }
-                                pathOutput[tracebackTimestep] = pathTraceback;
-                                pathTraceback = problemData.nodePredecessors[tracebackTimestep].at(pathTraceback);
-                                tracebackTimestep--;
-                            }
-                        } catch (std::out_of_range& e) {
-                            std::cerr << "Path traceback out of range: " << e.what() << std::endl;
-                        }
-                    }
-                    return true;
-                }
-
-                currentShipPositions[neighborPosition.x][neighborPosition.y] = true;
-                numPossiblePositions++;
+            // If this position is already marked, skip it
+            if (currentShipPositions[neighborPosition.x][neighborPosition.y]) {
+                continue;
             }
+
+            // If we can't sail to this position because it is either on land or because the wave height is too
+            // great for the Jolly Mon to handle, skip it
+            if (islandMap[neighborPosition.x][neighborPosition.y] >= LAND_THRESHOLD ||
+                currentWaveIntensity[neighborPosition.x][neighborPosition.y] >= SHIP_THRESHOLD) {
+                continue;
+            }
+
+            if (problemData.constructPathForVisualization) {
+                // Add the previous node as the method we used to get here. This is only needed to draw the path for
+                // the output visualization.
+                if (neighborPosition.distanceTo(portRoyal) <= TIME_STEPS - timestep) {
+                    Position2D &predecessor = problemData.nodePredecessors[timestep][neighborPosition];
+                    predecessor = previousPosition;
+                }
+            }
+
+            // If we reach Port Royal, we win.
+            if (neighborPosition == portRoyal) {
+                return true;
+            }
+            currentShipPositions[neighborPosition.x][neighborPosition.y] = true;
+            q.push(neighborPosition);
+            numPossiblePositions++;
         }
+        q.pop();
     }
     // This is not strictly required but can be used to track how much additional memory our path traceback structures
     // are using.
@@ -164,7 +131,7 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
 }
 
 
- // Your main simulation routine.
+// Your main simulation routine.
 int main(int argc, char *argv[]) {
     bool outputVisualization = false;
     bool constructPathForVisualization = false;
@@ -195,13 +162,14 @@ int main(int argc, char *argv[]) {
 
         int pathLength = -1;
         std::vector<Position2D> path;
+        std::queue<Position2D> q;
 
         for (int t = 2; t < TIME_STEPS; t++) {
             // First simulate all cycles of the storm
             simulate_waves(*problemData);
 
             // Help captain Sparrow navigate the waves
-            if (findPathWithExhaustiveSearch(*problemData, t, path)) {
+            if (findPathWithExhaustiveSearch(*problemData, t, path, q)) {
                 // The length of the path is one shorter than the time step because the first frame is not part of the
                 // pathfinding, and the second frame is always the start position.
                 pathLength = t - 1;
@@ -215,7 +183,6 @@ int main(int argc, char *argv[]) {
             }
 
             // Rotates the buffers, recycling no longer needed data buffers for writing new data.
-            problemData->flipSearchBuffers();
             problemData->flipWaveBuffers();
         }
         // Submit our solution back to the system.

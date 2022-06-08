@@ -1,7 +1,7 @@
 CXX = g++
 CXX_FLAGS = --std=c++17 -Wall -Wextra -fopenmp -march=native -O3
 
-all: sequential_implementation student_submission env_file
+all: sequential_implementation student_submission sequential_implementation1 env_file
 
 Utility.o: Utility.cpp
 	$(CXX) $(CXX_FLAGS) -c -o Utility.o Utility.cpp
@@ -14,6 +14,9 @@ LodePng.o: lib/lodepng.cpp
 
 sequential_implementation: sequential_implementation.cpp Utility.o VideoOutput.o LodePng.o
 	$(CXX) $(CXX_FLAGS) -o sequential_implementation sequential_implementation.cpp Utility.o VideoOutput.o LodePng.o
+
+sequential_implementation1: sequential_implementation.cpp Utility.o VideoOutput.o LodePng.o
+	$(CXX) $(CXX_FLAGS) -o sequential_implementation1 sequential_implementation1.cpp Utility.o VideoOutput.o LodePng.o
 
 student_submission: student_submission.cpp Utility.o VideoOutput.o LodePng.o
 	$(CXX) $(CXX_FLAGS) -o student_submission student_submission.cpp Utility.o VideoOutput.o LodePng.o
