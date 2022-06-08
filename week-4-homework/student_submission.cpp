@@ -112,32 +112,6 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
 
                 // If we reach Port Royal, we win.
                 if (neighborPosition == portRoyal) {
-                    if (problemData.outputVisualization) {
-                        // We flip the search buffer back to the previous one to prevent drawing a half finished buffer
-                        // to screen (purely aesthetic).
-                        problemData.flipSearchBuffers();
-                    }
-                    if (problemData.constructPathForVisualization) {
-                        try {
-                            // Trace back our path from the end to the beginning. This is just used to draw a path into
-                            // the output video
-                            Position2D pathTraceback = neighborPosition;
-                            pathOutput.resize(timestep + 1);
-                            int tracebackTimestep = timestep;
-                            while (pathTraceback != start) {
-                                if (tracebackTimestep <= 0) {
-                                    std::cerr << "Traceback did not lead back to origin before timestep 0!"
-                                              << std::endl;
-                                    break;
-                                }
-                                pathOutput[tracebackTimestep] = pathTraceback;
-                                pathTraceback = problemData.nodePredecessors[tracebackTimestep].at(pathTraceback);
-                                tracebackTimestep--;
-                            }
-                        } catch (std::out_of_range& e) {
-                            std::cerr << "Path traceback out of range: " << e.what() << std::endl;
-                        }
-                    }
                     return true;
                 }
 
