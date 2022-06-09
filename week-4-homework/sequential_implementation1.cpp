@@ -9,6 +9,7 @@
 #include "VideoOutput.h"
 #include "Utility.h"
 
+
 void simulate_waves(ProblemData &problemData) {
     auto &islandMap = problemData.islandMap;
     float (&secondLastWaveIntensity)[MAP_SIZE][MAP_SIZE] = *problemData.secondLastWaveIntensity;
@@ -68,14 +69,18 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
     bool (&previousShipPositions)[MAP_SIZE][MAP_SIZE] = *problemData.previousShipPositions;
 
     // We could always have been at the start in the previous frame since we get to choose when we start our journey.
-    if (q.empty())
-        q.push(Position2D(start.x, start.y));
-    currentShipPositions[start.x][start.y] = true;
+    q.push(Position2D(start.x, start.y));
 
     // Ensure that our new buffer is set to zero. We need to ensure this because we are reusing previously used buffers.
+    for (int x = 0; x < MAP_SIZE; ++x) {
+        for (int y = 0; y < MAP_SIZE; ++y) {
+            currentShipPositions[x][y] = false;
+        }
+    }
 
     // Do the actual path finding.
     int size = q.size();
+//    printf("time step: %d\n", timestep);
     for (int i = 0; i < size; ++i) {
         // If there is no possibility to reach this position then we don't need to process it.
         Position2D previousPosition(q.front().x, q.front().y);
@@ -123,6 +128,7 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
 //            printf("(%d, %d)\n", neighborPosition.x, neighborPosition.y);
             currentShipPositions[neighborPosition.x][neighborPosition.y] = true;
             q.push(neighborPosition);
+//            printf("(%d, %d)\n", neighborPosition.x, neighborPosition.y);
             numPossiblePositions++;
         }
         q.pop();

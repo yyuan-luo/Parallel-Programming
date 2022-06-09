@@ -77,6 +77,7 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
     }
 
     // Do the actual path finding.
+//    printf("time step: %d\n", timestep);
     for (int x = 0; x < MAP_SIZE; ++x) {
         for (int y = 0; y < MAP_SIZE; ++y) {
             // If there is no possibility to reach this position then we don't need to process it.
