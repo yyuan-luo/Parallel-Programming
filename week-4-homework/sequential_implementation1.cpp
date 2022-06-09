@@ -75,7 +75,8 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
     // Ensure that our new buffer is set to zero. We need to ensure this because we are reusing previously used buffers.
 
     // Do the actual path finding.
-    for (int i = 0; i < q.size(); ++i) {
+    int size = q.size();
+    for (int i = 0; i < size; ++i) {
         // If there is no possibility to reach this position then we don't need to process it.
         Position2D previousPosition(q.front().x, q.front().y);
 
