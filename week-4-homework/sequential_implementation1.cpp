@@ -16,6 +16,7 @@ void simulate_waves(ProblemData &problemData) {
     float (&lastWaveIntensity)[MAP_SIZE][MAP_SIZE] = *problemData.lastWaveIntensity;
     float (&currentWaveIntensity)[MAP_SIZE][MAP_SIZE] = *problemData.currentWaveIntensity;
 
+#pragma omp parallel for schedule(dynamic)
     for (int x = 1; x < MAP_SIZE - 1; ++x) {
         for (int y = 1; y < MAP_SIZE - 1; ++y) {
 
@@ -70,8 +71,10 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
 
     // We could always have been at the start in the previous frame since we get to choose when we start our journey.
     q.push(Position2D(start.x, start.y));
-
+    int size = q.size();
+    std::vector<Position2D> positions(size);
     // Ensure that our new buffer is set to zero. We need to ensure this because we are reusing previously used buffers.
+#pragma omp parallel for schedule(static, 32)
     for (int x = 0; x < MAP_SIZE; ++x) {
         for (int y = 0; y < MAP_SIZE; ++y) {
             currentShipPositions[x][y] = false;
@@ -79,7 +82,6 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
     }
 
     // Do the actual path finding.
-    int size = q.size();
 //    printf("time step: %d\n", timestep);
     for (int i = 0; i < size; ++i) {
         // If there is no possibility to reach this position then we don't need to process it.
