@@ -15,7 +15,6 @@ void simulate_waves(ProblemData &problemData) {
     float (&lastWaveIntensity)[MAP_SIZE][MAP_SIZE] = *problemData.lastWaveIntensity;
     float (&currentWaveIntensity)[MAP_SIZE][MAP_SIZE] = *problemData.currentWaveIntensity;
 
-#pragma omp parallel for schedule(static, 32)
     for (int x = 1; x < MAP_SIZE - 1; ++x) {
         for (int y = 1; y < MAP_SIZE - 1; ++y) {
 
@@ -45,8 +44,7 @@ void simulate_waves(ProblemData &problemData) {
                 currentWaveIntensity[x][y] = 0.0f;
             } else {
                 currentWaveIntensity[x][y] =
-                        std::clamp(lastWaveIntensity[x][y] + (last_velocity + acceleration) * energyPreserved, 0.0f,
-                                   1.0f);
+                        std::clamp(lastWaveIntensity[x][y] + (last_velocity + acceleration) * energyPreserved, 0.0f, 1.0f);
             }
         }
     }
@@ -57,7 +55,7 @@ void simulate_waves(ProblemData &problemData) {
 // Unfortunately, sometimes you just have to make do with what you have. So here we use a search algorithm that searches
 // the entire domain every time step and calculates all possible ship positions.
 bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
-                                  std::vector <Position2D> &pathOutput) {
+                                  std::vector<Position2D> &pathOutput) {
     auto &start = problemData.shipOrigin;
     auto &portRoyal = problemData.portRoyal;
     auto &islandMap = problemData.islandMap;
@@ -72,7 +70,6 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
     previousShipPositions[start.x][start.y] = true;
 
     // Ensure that our new buffer is set to zero. We need to ensure this because we are reusing previously used buffers.
-#pragma omp parallel for schedule(static, 32)
     for (int x = 0; x < MAP_SIZE; ++x) {
         for (int y = 0; y < MAP_SIZE; ++y) {
             currentShipPositions[x][y] = false;
@@ -80,11 +77,9 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
     }
 
     // Do the actual path finding.
-    volatile bool flag = false;
-#pragma omp parallel for schedule(static, 32) shared(flag) reduction(+: numPossiblePositions)
+//    printf("time step: %d\n", timestep);
     for (int x = 0; x < MAP_SIZE; ++x) {
         for (int y = 0; y < MAP_SIZE; ++y) {
-            if (flag) continue;
             // If there is no possibility to reach this position then we don't need to process it.
             if (!previousShipPositions[x][y]) {
                 continue;
@@ -128,9 +123,36 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
 
                 // If we reach Port Royal, we win.
                 if (neighborPosition == portRoyal) {
-                    flag = true;
+//                    printf("porRoyal reached\n");
+                    if (problemData.outputVisualization) {
+                        // We flip the search buffer back to the previous one to prevent drawing a half finished buffer
+                        // to screen (purely aesthetic).
+                        problemData.flipSearchBuffers();
+                    }
+                    if (problemData.constructPathForVisualization) {
+                        try {
+                            // Trace back our path from the end to the beginning. This is just used to draw a path into
+                            // the output video
+                            Position2D pathTraceback = neighborPosition;
+                            pathOutput.resize(timestep + 1);
+                            int tracebackTimestep = timestep;
+                            while (pathTraceback != start) {
+                                if (tracebackTimestep <= 0) {
+                                    std::cerr << "Traceback did not lead back to origin before timestep 0!"
+                                              << std::endl;
+                                    break;
+                                }
+                                pathOutput[tracebackTimestep] = pathTraceback;
+                                pathTraceback = problemData.nodePredecessors[tracebackTimestep].at(pathTraceback);
+                                tracebackTimestep--;
+                            }
+                        } catch (std::out_of_range& e) {
+                            std::cerr << "Path traceback out of range: " << e.what() << std::endl;
+                        }
+                    }
+                    return true;
                 }
-
+//                printf("(%d, %d)\n", neighborPosition.x, neighborPosition.y);
                 currentShipPositions[neighborPosition.x][neighborPosition.y] = true;
                 numPossiblePositions++;
             }
@@ -140,7 +162,7 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
     // are using.
     problemData.numPredecessors += problemData.nodePredecessors[timestep].size();
 
-    return flag;
+    return false;
 }
 
 
@@ -157,6 +179,10 @@ int main(int argc, char *argv[]) {
     // Fetch the seed from our container host used to generate the problem. This starts the timer.
     unsigned int seed = Utility::readInput();
 
+    if (outputVisualization) {
+        VideoOutput::beginVideoOutput();
+    }
+
     auto *problemData0 = new ProblemData();
     Utility::generateProblem((seed + 0 * JUMP_SIZE) & INT_LIM, *problemData0);
 
@@ -171,7 +197,7 @@ int main(int argc, char *argv[]) {
 
 
     // Note that on the submission server, we are solving "numProblems" problems
-    int pathLength[4] = {-1, -1, -1, -1};
+#pragma omp parallel for schedule(dynamic)
     for (int problem = 0; problem < numProblems; ++problem) {
         ProblemData *problemData;
         switch (problem)
@@ -191,32 +217,34 @@ int main(int argc, char *argv[]) {
             default:
                 break;
         }
-#pragma omp task shared(pathLength)
-        {
+        std::cerr << "Searching from ship position (" << problemData->shipOrigin.x << ", " << problemData->shipOrigin.y
+                  << ") to Port Royal (" << problemData->portRoyal.x << ", " << problemData->portRoyal.y << ")."<< std::endl;
+
+        int pathLength = -1;
         std::vector<Position2D> path;
-            for (int t = 2; t < TIME_STEPS; t++) {
-                // First simulate all cycles of the storm
-                simulate_waves(*problemData);
+
+        for (int t = 2; t < TIME_STEPS; t++) {
+            // First simulate all cycles of the storm
+            simulate_waves(*problemData);
 
 
-                // Help captain Sparrow navigate the waves
-                if (findPathWithExhaustiveSearch(*problemData, t, path)) {
-                    // The length of the path is one shorter than the time step because the first frame is not part of the
-                    // pathfinding, and the second frame is always the start position.
-                    pathLength[problem] = t - 1;
-                }
-
-                if (pathLength[problem] != -1) {
-                    break;
-                }
-
-                // Rotates the buffers, recycling no longer needed data buffers for writing new data.
-                problemData->flipSearchBuffers();
-                problemData->flipWaveBuffers();
+            // Help captain Sparrow navigate the waves
+            if (findPathWithExhaustiveSearch(*problemData, t, path)) {
+                // The length of the path is one shorter than the time step because the first frame is not part of the
+                // pathfinding, and the second frame is always the start position.
+                pathLength = t - 1;
             }
+
+            if (pathLength != -1) {
+                break;
+            }
+
+            // Rotates the buffers, recycling no longer needed data buffers for writing new data.
+            problemData->flipSearchBuffers();
+            problemData->flipWaveBuffers();
         }
         // Submit our solution back to the system.
-        Utility::writeOutput(pathLength[problem]);
+        Utility::writeOutput(pathLength);
     }
     // This stops the timer by printing DONE.
     Utility::stopTimer();
@@ -225,7 +253,6 @@ int main(int argc, char *argv[]) {
     delete problemData1;
     delete problemData2;
     delete problemData3;
-
 
     return 0;
 }

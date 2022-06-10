@@ -73,14 +73,6 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
     if (q.empty())
         q.push(Position2D(start.x, start.y));
     int size = q.size();
-    int *xs = (int*)malloc(sizeof(int) * size);
-    int *ys = (int*)malloc(sizeof(int) * size);
-    for (int i = 0; i < size; i++) {
-        Position2D tmp = q.front();
-        xs[i] = tmp.x;
-        ys[i] = tmp.y;
-        q.pop();
-    }
 
     // Ensure that our new buffer is set to zero. We need to ensure this because we are reusing previously used buffers.
 #pragma omp parallel for schedule(static, 32)
@@ -91,14 +83,11 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
     }
 
     // Do the actual path finding.
-    printf("time step: %d\n", timestep);
-    volatile bool flag = false;
-#pragma omp parallel for schedule(static, 32) shared(flag) reduction(+: numPossiblePositions)
     for (int i = 0; i < size; ++i) {
-        if (flag) continue;
+        Position2D tmp = q.front();
         // If there is no possibility to reach this position then we don't need to process it.
 //        printf("(%d, %d)\n", q.front().x, q.front().y);
-        Position2D previousPosition(xs[i], ys[i]);
+        Position2D previousPosition(tmp.x, tmp.y);
 
         // The Jolly Mon (Jack's ship) is not very versatile. It can only move along the four cardinal directions by one
         // square each and along their diagonals. Alternatively, it can just try to stay where it is.
@@ -138,7 +127,7 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
             // If we reach Port Royal, we win.
             if (neighborPosition == portRoyal) {
 //                printf("porRoyal reached\n");
-                flag = true;
+                return true;
             }
 //            printf("(%d, %d)\n", neighborPosition.x, neighborPosition.y);
             currentShipPositions[neighborPosition.x][neighborPosition.y] = true;
@@ -146,13 +135,12 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
 //            printf("(%d, %d)\n", neighborPosition.x, neighborPosition.y);
             numPossiblePositions++;
         }
+        q.pop();
     }
     // This is not strictly required but can be used to track how much additional memory our path traceback structures
     // are using.
     problemData.numPredecessors += problemData.nodePredecessors[timestep].size();
-    free(xs);
-    free(ys);
-    return flag;
+    return false;
 }
 
 
