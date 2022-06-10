@@ -15,7 +15,7 @@ void simulate_waves(ProblemData &problemData) {
     float (&lastWaveIntensity)[MAP_SIZE][MAP_SIZE] = *problemData.lastWaveIntensity;
     float (&currentWaveIntensity)[MAP_SIZE][MAP_SIZE] = *problemData.currentWaveIntensity;
 
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static, 32)
     for (int x = 1; x < MAP_SIZE - 1; ++x) {
         for (int y = 1; y < MAP_SIZE - 1; ++y) {
 
@@ -72,6 +72,7 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
     previousShipPositions[start.x][start.y] = true;
 
     // Ensure that our new buffer is set to zero. We need to ensure this because we are reusing previously used buffers.
+#pragma omp parallel for schedule(static, 32)
     for (int x = 0; x < MAP_SIZE; ++x) {
         for (int y = 0; y < MAP_SIZE; ++y) {
             currentShipPositions[x][y] = false;
@@ -80,7 +81,7 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
 
     // Do the actual path finding.
     volatile bool flag = false;
-#pragma omp parallel for schedule(dynamic) shared(flag) reduction(+: numPossiblePositions)
+#pragma omp parallel for schedule(static, 32) shared(flag) reduction(+: numPossiblePositions)
     for (int x = 0; x < MAP_SIZE; ++x) {
         for (int y = 0; y < MAP_SIZE; ++y) {
             if (flag) continue;
@@ -147,7 +148,7 @@ bool findPathWithExhaustiveSearch(ProblemData &problemData, int timestep,
 int main(int argc, char *argv[]) {
     bool outputVisualization = false;
     bool constructPathForVisualization = false;
-    int numProblems = 1;
+    int numProblems = 4;
     int option;
 
     //Not interesting for parallelization
@@ -163,8 +164,6 @@ int main(int argc, char *argv[]) {
     // Note that on the submission server, we are solving "numProblems" problems
     for (int problem = 0; problem < numProblems; ++problem) {
         auto *problemData = new ProblemData();
-        problemData->outputVisualization = outputVisualization;
-        problemData->constructPathForVisualization = constructPathForVisualization;
 
         // Receive the problem from the system.
         Utility::generateProblem((seed + problem * JUMP_SIZE) & INT_LIM, *problemData);
