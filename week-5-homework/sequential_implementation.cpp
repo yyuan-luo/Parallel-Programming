@@ -6,6 +6,7 @@
 #include <deque>
 #include <future>
 #include <functional>
+#include <iostream>
 
 #include "Utility.h"
 
@@ -116,6 +117,11 @@ int main(int argc, char *argv[]) {
     }
 
     Utility::printHash(solution);
+//    for (int i = 0; i < numProblems; ++i) {
+//        std::cout << i << " ";
+//        Utility::printHash(solutionHashes[i]);
+//        std::cout << std::endl;
+//    }
     printf("DONE\n");
 
     return 0;

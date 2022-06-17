@@ -9,6 +9,7 @@
 #include <thread>
 #include <condition_variable>
 #include <functional>
+#include <iostream>
 
 #include "Utility.h"
 
@@ -19,7 +20,11 @@ std::mutex m;
 std::condition_variable cv;
 
 Sha1Hash solutionHashes[10000];
+
 int seed;
+int leadingZerosProblem = 8;
+int leadingZerosSolution = 11;
+int numProblems = 10000;
 
 struct Problem {
     Sha1Hash sha1_hash;
@@ -87,17 +92,19 @@ int count_problem = 0;
 void distribute_thread() {
     srand(seed);
 
-    for(int i = 0; i < 10000; i++){
+    for(int i = 0; i < numProblems; i++){
         std::string base = std::to_string(rand()) + std::to_string(rand());
         Sha1Hash hash = Utility::sha1(base);
         do{
             // we keep hashing ourself until we find the desired amount of leading zeros
             hash = Utility::sha1(hash);
-        }while(Utility::count_leading_zero_bits(hash) < 8);
+        }while(Utility::count_leading_zero_bits(hash) < leadingZerosProblem);
+
         std::unique_lock<std::mutex> lk(m);
         problemQueue.push(Problem{hash, i});
         count_problem++;
         lk.unlock();
+
         cv.notify_one();
     }
 }
@@ -107,17 +114,14 @@ void work_thread() {
         std::unique_lock <std::mutex> lk(m);
         cv.wait(lk, [] { return count_problem; });
         count_problem--;
-        printf("count_problem: %d\n", count_problem);
+//        printf("count_problem: %d\n", count_problem);
         lk.unlock();
         Problem p = problemQueue.pop();
-        solutionHashes[p.problemNum] = findSolutionHash(p.sha1_hash, 11);
+        solutionHashes[p.problemNum] = findSolutionHash(p.sha1_hash, leadingZerosSolution);
     }
 }
 
 int main(int argc, char *argv[]) {
-    int leadingZerosProblem = 8;
-    int leadingZerosSolution = 11;
-    int numProblems = 10000;
 
     //Not interesting for parallelization
     Utility::parse_input(numProblems, leadingZerosProblem, leadingZerosSolution, argc, argv);
@@ -182,6 +186,11 @@ int main(int argc, char *argv[]) {
     }
 
     Utility::printHash(solution);
+//    for (int i = 0; i < numProblems; ++i) {
+//        std::cout << i << " ";
+//        Utility::printHash(solutionHashes[i]);
+//        std::cout << std::endl;
+//    }
     printf("DONE\n");
 
     return 0;

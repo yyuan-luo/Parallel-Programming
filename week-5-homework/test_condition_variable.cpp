@@ -15,26 +15,28 @@ std::queue<int> queue;
 
 void worker_thread()
 {
-    // Wait until main() sends data
-    std::unique_lock<std::mutex> lk(m);
-    cv.wait(lk, []{return count;});
+    while (count) {
+        // Wait until main() sends data
+        std::unique_lock <std::mutex> lk(m);
+        cv.wait(lk, [] { return count; });
 
-    // after the wait, we own the lock.
-    std::cout << "Worker thread is working\n";
+        // after the wait, we own the lock.
+        std::cout << "Worker thread is working\n";
 
-    count--;
+        count--;
 
-    // Send data back to main()
-    std::cout << "count in thread is " << count << " and the data from the queue is " << queue.front() << "\n";
-    queue.pop();
-    // Manual unlocking is done before notifying, to avoid waking up
-    // the waiting thread only to block again (see notify_one for details)
-    lk.unlock();
+        // Send data back to main()
+        std::cout << "count in thread is " << count << " and the data from the queue is " << queue.front() << "\n";
+        queue.pop();
+        // Manual unlocking is done before notifying, to avoid waking up
+        // the waiting thread only to block again (see notify_one for details)
+        lk.unlock();
+    }
 }
 
 void distributor_thread() {
     std::cout << "distributor now starts to distribute the tasks\n";
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 100; ++i) {
         std::unique_lock<std::mutex> lk(m);
         queue.push(i);
         count++;
