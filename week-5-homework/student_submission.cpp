@@ -103,12 +103,15 @@ void distribute_thread() {
 }
 
 void work_thread() {
-    std::unique_lock<std::mutex> lk(m);
-    cv.wait(lk, [] {return count_problem;});
-    count_problem--;
-    lk.unlock();
-    Problem p = problemQueue.pop();
-    solutionHashes[p.problemNum] = findSolutionHash(p.sha1_hash, 11);
+    while (count_problem > 0) {
+        std::unique_lock <std::mutex> lk(m);
+        cv.wait(lk, [] { return count_problem; });
+        count_problem--;
+        printf("count_problem: %d\n", count_problem);
+        lk.unlock();
+        Problem p = problemQueue.pop();
+        solutionHashes[p.problemNum] = findSolutionHash(p.sha1_hash, 11);
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -118,7 +121,6 @@ int main(int argc, char *argv[]) {
 
     //Not interesting for parallelization
     Utility::parse_input(numProblems, leadingZerosProblem, leadingZerosSolution, argc, argv);
-    Sha1Hash solutionHashes[numProblems];
 
     seed = Utility::readInput();
 
@@ -156,17 +158,16 @@ int main(int argc, char *argv[]) {
 //        Problem p = problemQueue.pop();
 //        solutionHashes[p.problemNum] = findSolutionHash(p.sha1_hash, leadingZerosSolution);
 //    }
+    distributor.join();
+    for (int i = 0; i < NUM_THREADS - 1; ++i) {
+        workers[i].join();
+    }
 
     #if MEASURE_TIME
     clock_gettime(CLOCK_MONOTONIC, &solve_end);
     double solve_time = (((double) solve_end.tv_sec + 1.0e-9 * solve_end.tv_nsec) - ((double) solve_start.tv_sec + 1.0e-9 * solve_start.tv_nsec));
     fprintf(stderr, "Solve Problem time:     %.7gs\n", solve_time);
     #endif
-
-    distributor.join();
-    for (int i = 0; i < NUM_THREADS - 1; ++i) {
-        workers[i].join();
-    }
     /*
     * TODO@Students: Make sure all work has finished before calculating the solution
     * Tip: Push a special problem for each thread onto the queue that tells a thread to break and stop working
