@@ -47,7 +47,7 @@ ProblemQueue problemQueue;
 
 
 // generate numProblems sha1 hashes with leadingZerosProblem leading zero bits
-// This method is intentionally compute intense so you can already start working on solving
+// This method is intentionally compute intense, so you can already start working on solving
 // problems while more problems are generated
 void generateProblem(int seed, int numProblems, int leadingZerosProblem){
     srand(seed);
@@ -92,6 +92,8 @@ int main(int argc, char *argv[]) {
     /*
     * TODO@Students: Generate the problem in another thread and start already working on solving the problems while the generation continues
     */
+
+    /** condition variable notifies one thread each time based on how many tasks are now in the queue (cv.notify_one()) */
     generateProblem(seed, numProblems, leadingZerosProblem);
 
     #if MEASURE_TIME
@@ -125,7 +127,7 @@ int main(int argc, char *argv[]) {
     Sha1Hash solution;
     // guarantee initial solution hash data is zero
     memset(solution.data, 0, SHA1_BYTES);
-    // this doesn't need parallelization. it's neglectibly fast
+    // this doesn't need parallelization. it's negligibly fast
     for(int i = 0; i < numProblems; i++){
         solution = Utility::sha1(solution, solutionHashes[i]);
     }
