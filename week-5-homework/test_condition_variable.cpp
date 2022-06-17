@@ -34,7 +34,7 @@ void worker_thread()
 
 void distributor_thread() {
     std::cout << "distributor now starts to distribute the tasks\n";
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 3; ++i) {
         std::unique_lock<std::mutex> lk(m);
         queue.push(i);
         count++;

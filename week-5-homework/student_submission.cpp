@@ -128,7 +128,7 @@ int main(int argc, char *argv[]) {
     #endif
 
     std::thread workers[NUM_THREADS-1];
-    std::thread dis(distribute_thread);
+    std::thread distributor(distribute_thread);
     for (int i = 0; i < NUM_THREADS - 1; ++i) {
         workers[i] = std::thread(work_thread);
     }
@@ -163,6 +163,10 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Solve Problem time:     %.7gs\n", solve_time);
     #endif
 
+    distributor.join();
+    for (int i = 0; i < NUM_THREADS - 1; ++i) {
+        workers[i].join();
+    }
     /*
     * TODO@Students: Make sure all work has finished before calculating the solution
     * Tip: Push a special problem for each thread onto the queue that tells a thread to break and stop working
