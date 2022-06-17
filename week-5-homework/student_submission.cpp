@@ -5,11 +5,21 @@
 #include <string>
 #include <deque>
 #include <future>
+#include <mutex>
+#include <thread>
+#include <condition_variable>
 #include <functional>
 
 #include "Utility.h"
 
 #define MEASURE_TIME true
+#define NUM_THREADS 32
+
+std::mutex m;
+std::condition_variable cv;
+
+Sha1Hash solutionHashes[10000];
+int seed;
 
 struct Problem {
     Sha1Hash sha1_hash;
@@ -73,8 +83,32 @@ Sha1Hash findSolutionHash(Sha1Hash hash, int leadingZerosSolution){
     return hash;
 }
 
-void distribute_thread(unsigned int seed, int numProblems, int leadingZerosProblem) {
-    generateProblem(seed, numProblems, leadingZerosProblem);
+int count_problem = 0;
+void distribute_thread() {
+    srand(seed);
+
+    for(int i = 0; i < 10000; i++){
+        std::string base = std::to_string(rand()) + std::to_string(rand());
+        Sha1Hash hash = Utility::sha1(base);
+        do{
+            // we keep hashing ourself until we find the desired amount of leading zeros
+            hash = Utility::sha1(hash);
+        }while(Utility::count_leading_zero_bits(hash) < 8);
+        std::unique_lock<std::mutex> lk(m);
+        problemQueue.push(Problem{hash, i});
+        count_problem++;
+        lk.unlock();
+        cv.notify_one();
+    }
+}
+
+void work_thread() {
+    std::unique_lock<std::mutex> lk(m);
+    cv.wait(lk, [] {return count_problem;});
+    count_problem--;
+    lk.unlock();
+    Problem p = problemQueue.pop();
+    solutionHashes[p.problemNum] = findSolutionHash(p.sha1_hash, 11);
 }
 
 int main(int argc, char *argv[]) {
@@ -86,19 +120,25 @@ int main(int argc, char *argv[]) {
     Utility::parse_input(numProblems, leadingZerosProblem, leadingZerosSolution, argc, argv);
     Sha1Hash solutionHashes[numProblems];
 
-    unsigned int seed = Utility::readInput();
+    seed = Utility::readInput();
 
     #if MEASURE_TIME
     struct timespec generation_start, generation_end;
     clock_gettime(CLOCK_MONOTONIC, &generation_start);
     #endif
 
+    std::thread workers[NUM_THREADS-1];
+    std::thread dis(distribute_thread);
+    for (int i = 0; i < NUM_THREADS - 1; ++i) {
+        workers[i] = std::thread(work_thread);
+    }
+
     /*
     * TODO@Students: Generate the problem in another thread and start already working on solving the problems while the generation continues
     */
 
     /** condition variable notifies one thread each time based on how many tasks are now in the queue (cv.notify_one()) */
-    generateProblem(seed, numProblems, leadingZerosProblem);
+//    generateProblem(seed, numProblems, leadingZerosProblem);
 
     #if MEASURE_TIME
     clock_gettime(CLOCK_MONOTONIC, &generation_end);
@@ -112,10 +152,10 @@ int main(int argc, char *argv[]) {
     /*
     * TODO@Students: Create worker threads that parallelize this functionality. Add the synchronization directly to the queue
     */
-    while(!problemQueue.empty()) {
-        Problem p = problemQueue.pop();
-        solutionHashes[p.problemNum] = findSolutionHash(p.sha1_hash, leadingZerosSolution);
-    }
+//    while(!problemQueue.empty()) {
+//        Problem p = problemQueue.pop();
+//        solutionHashes[p.problemNum] = findSolutionHash(p.sha1_hash, leadingZerosSolution);
+//    }
 
     #if MEASURE_TIME
     clock_gettime(CLOCK_MONOTONIC, &solve_end);
