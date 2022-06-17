@@ -73,6 +73,10 @@ Sha1Hash findSolutionHash(Sha1Hash hash, int leadingZerosSolution){
     return hash;
 }
 
+void distribute_thread(unsigned int seed, int numProblems, int leadingZerosProblem) {
+    generateProblem(seed, numProblems, leadingZerosProblem);
+}
+
 int main(int argc, char *argv[]) {
     int leadingZerosProblem = 8;
     int leadingZerosSolution = 11;
