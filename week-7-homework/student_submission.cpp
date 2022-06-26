@@ -19,31 +19,35 @@ void print256_num(__m256 var) {
            val[6], val[7]);
 }
 
+float cal256_sum(__m256 var) {
+    float val[8];
+    memcpy(val, &var, sizeof(val));
+    float sum = 0.0f;
+    for (int i = 0; i < 8; ++i)
+        sum += val[i];
+    return sum;
+}
+
 void dgemm(float alpha, const float *a, const float *b, float beta, float *c) {
-    __m256 be = _mm256_set1_ps(beta);
     __m256 al = _mm256_set1_ps(alpha);
     for (int i = 0; i < MATRIX_SIZE; i++) {
-        for (int j = 0; j < ALIGNED_MATRIX_SIZE; j += 8) {
-            // c[i][j: j + 8]
-            __m256 c_tmp = _mm256_load_ps(c + i * ALIGNED_MATRIX_SIZE + j);
-            c_tmp = _mm256_mul_ps(c_tmp, be);
-            for (int k = 0; k < MATRIX_SIZE; k++) {
-                // a[i][k]
-                __m256 a_tmp = _mm256_broadcast_ss(a + i * MATRIX_SIZE + k);
+        for (int j = 0; j < MATRIX_SIZE; j++) {
+            // c[i][j]
+            __m256 c_tmp = _mm256_set1_ps(0);
+            for (int k = 0; k < ALIGNED_MATRIX_SIZE; k += 8) {
+                // a[i][k : k + 8]
+                __m256 a_tmp = _mm256_load_ps(a + i * ALIGNED_MATRIX_SIZE + k);
                 a_tmp = _mm256_mul_ps(a_tmp, al);
 
-                // b[k][j : j + 8]
-                __m256 b_tmp = _mm256_load_ps(b + k * ALIGNED_MATRIX_SIZE + j);
+                // b[j][k : k + 8]
+                __m256 b_tmp = _mm256_load_ps(b + j * ALIGNED_MATRIX_SIZE + k);
 
                 // * and +=
                 __m256 tmp = _mm256_mul_ps(a_tmp, b_tmp);
                 c_tmp = _mm256_add_ps(tmp, c_tmp);
-//                printf("k: %d c[%d][%d: %d + 8]:\n", k, i, j, j);
-//                print256_num(a_tmp);
-//                print256_num(b_tmp);
-//                print256_num(c_tmp);
             }
-            _mm256_store_ps(c + i * ALIGNED_MATRIX_SIZE + j, c_tmp);
+            c[i * MATRIX_SIZE + j] *= beta;
+            c[i * MATRIX_SIZE + j] += cal256_sum(c_tmp);
         }
     }
 }
@@ -64,17 +68,17 @@ void generateProblemFromInput(float &alpha, float *a, float *b, float &beta, flo
     /* initialisation */
     for (int i = 0; i < MATRIX_SIZE; i++) {
         for (int j = 0; j < MATRIX_SIZE; j++) {
-            *(a + i * MATRIX_SIZE + j) = distribution(random);
+            *(a + i * ALIGNED_MATRIX_SIZE + j) = distribution(random);
             *(b + i * ALIGNED_MATRIX_SIZE + j) = distribution(random);
-            *(c + i * ALIGNED_MATRIX_SIZE + j) = distribution(random);
+            *(c + i * MATRIX_SIZE + j) = distribution(random);
         }
     }
 
     // TODO: simd assign value
     for (int i = 0; i < MATRIX_SIZE; ++i) {
         for (int j = MATRIX_SIZE; j < ALIGNED_MATRIX_SIZE; ++j) {
+            *(a + i * ALIGNED_MATRIX_SIZE + j) = 0.0f;
             *(b + i * ALIGNED_MATRIX_SIZE + j) = 0.0f;
-            *(c + i * ALIGNED_MATRIX_SIZE + j) = 0.0f;
         }
     }
 
@@ -128,7 +132,7 @@ int main(int, char **) {
 
     // mem allocations
     int mem_size = MATRIX_SIZE * ALIGNED_MATRIX_SIZE * sizeof(float);
-    float *a = (float *) _mm_malloc(MATRIX_SIZE * MATRIX_SIZE * sizeof(float), 32);
+    float *a = (float *) _mm_malloc(mem_size, 32);
     float *b = (float *) _mm_malloc(mem_size, 32);
     float *c = (float *) _mm_malloc(mem_size, 32);
 
