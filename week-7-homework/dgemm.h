@@ -27,8 +27,11 @@ void generateProblemFromInput(float& alpha, float* a, float* b, float& beta, flo
         for (int j = 0; j < MATRIX_SIZE; j++) {
             *(a + i * MATRIX_SIZE + j) = distribution(random);
             *(b + i * MATRIX_SIZE + j) = distribution(random);
-            *(c + i * MATRIX_SIZE + j) = distribution(random);
         }
+    }
+
+    for(int i = 0; i < NUM_ELEMENTS; i++){
+        *(c + i) = distribution(random);
     }
 
     alpha = distribution(random);
