@@ -45,6 +45,7 @@ int main(int argc, char **argv) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     // TODO: get the total processes size from MPI
     MPI_Comm_size(MPI_COMM_WORLD, &size);
+    std::cout <<"rank: " << rank <<  " size: " << size << std::endl;
     float *old_wave_map = new float[MAP_HEIGHT * MAP_WIDTH];
     float *new_wave_map = new float[MAP_HEIGHT * MAP_WIDTH];
     float *highest_result = new float[ITER_NUM];

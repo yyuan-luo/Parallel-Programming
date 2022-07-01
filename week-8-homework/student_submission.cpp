@@ -22,6 +22,79 @@ void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) 
     auto &grid = *problemData.readGrid;
     auto &writeGrid = *problemData.writeGrid;
     // TODO: MPI_Send and MPI_Recv to be implemented
+    if (rank == 0) {
+        // top-left corner
+        MPI_Send(&grid[1][1], 1, MPI_CXX_BOOL, 3, 0, MPI_COMM_WORLD);
+        MPI_Recv(&grid[0][0], 1, MPI_CXX_BOOL, 3, 0, MPI_COMM_WORLD, nullptr);
+
+        // top
+        MPI_Send(&grid[1][1], block_width - 1, MPI_CXX_BOOL, 2, 1, MPI_COMM_WORLD);
+        MPI_Recv(&grid[0][1], block_width - 1, MPI_CXX_BOOL, 2, 1, MPI_COMM_WORLD, nullptr);
+
+        // left
+        bool tmp[block_width - 1];
+        for (int i = 1; i < block_width; ++i)
+            tmp[i - 1] = grid[i][1];
+        MPI_Send(tmp, block_width - 1, MPI_CXX_BOOL, 1, 2, MPI_COMM_WORLD);
+        MPI_Recv(tmp, block_width - 1, MPI_CXX_BOOL, 1, 2, MPI_COMM_WORLD, nullptr);
+        for (int i = 1; i < block_width; ++i)
+            grid[i][0] = tmp[i - 1];
+
+        // right
+        for (int i = 1; i < block_width; ++i) {
+            tmp[i - 1] = grid[i][block_width - 1];
+        }
+        MPI_Send(&tmp, block_width - 1, MPI_CXX_BOOL, 1, 3, MPI_COMM_WORLD);
+        MPI_Recv(tmp, block_width - 1, MPI_CXX_BOOL, 1, 3, MPI_COMM_WORLD, nullptr);
+        for (int i = 1; i < block_width; ++i) {
+            grid[block_width][i] = tmp[i - 1];
+        }
+
+        // bottom
+        MPI_Send(&grid[block_width - 1][1], block_width - 1, MPI_CXX_BOOL, 2, 4, MPI_COMM_WORLD);
+        MPI_Recv(&grid[block_width][1], block_width - 1, MPI_CXX_BOOL, 2, 4, MPI_COMM_WORLD, nullptr);
+
+    } else if (rank == 1) {
+        MPI_Send(&grid[1][GRID_SIZE - 2], 1, MPI_CXX_BOOL, 2, 0, MPI_COMM_WORLD);
+#if DEBUG
+        std::cout << "rank " << rank << " sent " << grid[1][GRID_SIZE - 2] << std::endl;
+#endif
+
+        MPI_Recv(&grid[0][GRID_SIZE - 1], 1, MPI_CXX_BOOL, 2, 1, MPI_COMM_WORLD, nullptr);
+#if DEBUG
+        std::cout << "rank " << rank << " received " << grid[0][GRID_SIZE - 1] << std::endl;
+#endif
+        bool tmp[GRID_SIZE - 1];
+        for (int i = 1; i < GRID_SIZE; ++i) {
+            tmp[i - 1] = grid[GRID_SIZE - 2][i];
+        }
+        MPI_Send(&tmp, block_width - 1, MPI_CXX_BOOL, 0, 3, MPI_COMM_WORLD);
+
+
+        MPI_Send(&grid[0][GRID_SIZE], block_width - 1, MPI_CXX_BOOL, 4, MPI_COMM_WORLD);
+
+
+    } else if (rank == 2) {
+        MPI_Recv(&grid[GRID_SIZE - 1][0], 1, MPI_CXX_BOOL, 1, 0, MPI_COMM_WORLD, nullptr);
+#if DEBUG
+        std::cout << "rank " << rank << " sent " << grid[GRID_SIZE - 1][0] << std::endl;
+#endif
+
+        MPI_Send(&grid[GRID_SIZE - 2][1], 1, MPI_CXX_BOOL, 1, 1, MPI_COMM_WORLD);
+#if DEBUG
+        std::cout << "rank " << rank << " received " << grid[GRID_SIZE - 2][1] << std::endl;
+#endif
+    } else if (rank == 3) {
+        MPI_Recv(&grid[GRID_SIZE - 1][GRID_SIZE - 1], 1, MPI_CXX_BOOL, 0, 0, MPI_COMM_WORLD, nullptr);
+#if DEBUG
+        std::cout << "rank " << rank << " sent " << grid[GRID_SIZE - 1][GRID_SIZE - 1] << std::endl;
+#endif
+
+        MPI_Send(&grid[GRID_SIZE - 2][GRID_SIZE - 2], 1, MPI_CXX_BOOL, 0, 1, MPI_COMM_WORLD);
+#if DEBUG
+        std::cout << "rank " << rank << " received " << grid[GRID_SIZE - 2][GRID_SIZE - 2] << std::endl;
+#endif
+    }
     // For each cell
     for (int i = std::max(1, (rank % sqrt_size) * block_width);
          i < std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width); i++) {
@@ -82,7 +155,6 @@ void copy_edges(bool(&grid)[GRID_SIZE][GRID_SIZE]) {
 int count_alive(ProblemData &data, int rank, int block_width, int sqrt_size) {
     auto &grid = *data.readGrid;
     int counter = 0;
-    // TODO: change range based on rank
     for (int x = std::max(1, (rank % sqrt_size) * block_width);
          x < std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width); x++) {
         for (int y = std::max(1, (rank / sqrt_size) * block_width);
@@ -110,7 +182,7 @@ int main(int argc, char **argv) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    std::cout << "size: " << size << std::endl;
+    std::cout << "size: " << size << " rank: " << rank << std::endl;
 
     int sqrt_size = sqrt(size);
     int block_width = GRID_SIZE / sqrt_size;
