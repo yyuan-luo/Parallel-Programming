@@ -10,6 +10,7 @@
 #include "VideoOutput.h"
 #include <mpi.h>
 #include <math.h>
+#include <iostream>
 
 #define CODE_VERSION 1
 
@@ -22,10 +23,10 @@ void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) 
     auto &writeGrid = *problemData.writeGrid;
     // TODO: MPI_Send and MPI_Recv to be implemented
     // For each cell
-    for (int x = max(1, (rank % block_num_horizontal) * block_width);
-         x < min(GRID_SIZE - 1, (rank % block_num_horizontal + 1) * block_width); x++) {
-        for (int y = max(1, (rank / block_num_horizontal) * block_width);
-             y < min(GRID_SIZE - 1, (rank / block_num_horizontal + 1) * block_width); y++) {
+    for (int i = std::max(1, (rank % sqrt_size) * block_width);
+         i < std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width); i++) {
+        for (int j = std::max(1, (rank / sqrt_size) * block_width);
+             j < std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width); j++) {
             // Calculate the number of neighbors
             int sum = grid[i - 1][j - 1] + grid[i - 1][j] + grid[i - 1][j + 1] +
                       grid[i][j - 1] + grid[i][j + 1] +
@@ -82,10 +83,10 @@ int count_alive(ProblemData &data, int rank, int block_width, int sqrt_size) {
     auto &grid = *data.readGrid;
     int counter = 0;
     // TODO: change range based on rank
-    for (int x = max(1, (rank % block_num_horizontal) * block_width);
-         x < min(GRID_SIZE - 1, (rank % block_num_horizontal + 1) * block_width); x++) {
-        for (int y = max(1, (rank / block_num_horizontal) * block_width);
-             y < min(GRID_SIZE - 1, (rank / block_num_horizontal + 1) * block_width); y++) {
+    for (int x = std::max(1, (rank % sqrt_size) * block_width);
+         x < std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width); x++) {
+        for (int y = std::max(1, (rank / sqrt_size) * block_width);
+             y < std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width); y++) {
             if (grid[x][y]) {
                 counter++;
             }
@@ -109,13 +110,15 @@ int main(int argc, char **argv) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    int sqrt_size = sqrt(size)
+    std::cout << "size: " << size << std::endl;
+
+    int sqrt_size = sqrt(size);
     int block_width = GRID_SIZE / sqrt_size;
 
     int local_sum = 0, global_sum = 0;
     auto *problemData = new ProblemData;
 
-    copy_edges(*problemData->readGrid);
+//    copy_edges(*problemData->readGrid);
 
     // As with Jack Sparrow's exercise, this needs FFMPEG (new and improved: this now works with more video players).
     // As an alternative, you can write individual png files to take a look at the data.
@@ -136,10 +139,10 @@ int main(int argc, char **argv) {
             /** might be possible to send the local _sum info to one process, since MPI_send is blocking
              * or apply MPI_Isend(Non-blocking) to store this info of each process in one process and printed
              * by that process */
-            local_sum = count_alive(problemData, rank, block_width, sqrt_size);
+            local_sum = count_alive(*problemData, rank, block_width, sqrt_size);
         }
 
-        evolve(*problemData);
+        evolve(*problemData, rank, block_width, sqrt_size);
 
         problemData->swapGrids();
     }
