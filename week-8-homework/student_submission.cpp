@@ -21,9 +21,10 @@
 void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) {
     auto &grid = *problemData.readGrid;
     auto &writeGrid = *problemData.writeGrid;
-    std::cout << "rank: " << rank <<  ": test\n";
-    // TODO: MPI_Send and MPI_Recv to be implemented
     if (rank == 0) {
+        bool *send = new bool(block_width - 1);
+        bool *receive = new bool(block_width - 1);
+
         // top-left corner
         MPI_Send(&grid[1][1], 1, MPI_CXX_BOOL, 3, 0, MPI_COMM_WORLD);
         MPI_Recv(&grid[0][0], 1, MPI_CXX_BOOL, 3, 0, MPI_COMM_WORLD, nullptr);
@@ -33,8 +34,6 @@ void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) 
         MPI_Recv(&grid[0][1], block_width - 1, MPI_CXX_BOOL, 2, 1, MPI_COMM_WORLD, nullptr);
 
         // left
-        bool *send = new bool(block_width - 1);
-        bool *receive = new bool(block_width - 1);
         for (int i = 1; i < block_width; ++i)
             send[i - 1] = grid[i][1];
         MPI_Send(send, block_width - 1, MPI_CXX_BOOL, 1, 2, MPI_COMM_WORLD);
@@ -55,24 +54,8 @@ void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) 
         MPI_Recv(&grid[block_width][1], block_width - 1, MPI_CXX_BOOL, 2, 4, MPI_COMM_WORLD, nullptr);
 
     } else if (rank == 1) {
-        // top-right corner
-        MPI_Send(&grid[1][GRID_SIZE - 2], 1, MPI_CXX_BOOL, 2, 0, MPI_COMM_WORLD);
-        MPI_Recv(&grid[0][GRID_SIZE - 1], 1, MPI_CXX_BOOL, 2, 0, MPI_COMM_WORLD, nullptr);
-
-        // top
-        MPI_Send(&grid[1][block_width], block_width - 1, MPI_CXX_BOOL, 3, 1, MPI_COMM_WORLD);
-        MPI_Recv(&grid[0][block_width], block_width - 1, MPI_CXX_BOOL, 3, 1, MPI_COMM_WORLD, nullptr);
-
-        // left
         bool *send = new bool(block_width - 1);
         bool *receive = new bool(block_width - 1);
-
-        MPI_Recv(receive, block_width - 1, MPI_CXX_BOOL, 0, 3, MPI_COMM_WORLD, nullptr);
-        for (int i = 1; i < block_width; ++i)
-            grid[i][block_width - 1] = receive[i - 1];
-        for (int i = 1; i < block_width; ++i)
-            send[i - 1] = grid[i][block_width];
-        MPI_Send(send, block_width - 1, MPI_CXX_BOOL, 0, 3, MPI_COMM_WORLD);
 
         // right
         MPI_Recv(receive, block_width - 1, MPI_CXX_BOOL, 0, 2, MPI_COMM_WORLD, nullptr);
@@ -82,22 +65,45 @@ void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) 
             send[i - 1] = grid[i][GRID_SIZE - 2];
         MPI_Send(send, block_width - 1, MPI_CXX_BOOL, 0, 2, MPI_COMM_WORLD);
 
+        // left
+        MPI_Recv(receive, block_width - 1, MPI_CXX_BOOL, 0, 3, MPI_COMM_WORLD, nullptr);
+        for (int i = 1; i < block_width; ++i)
+            grid[i][block_width - 1] = receive[i - 1];
+        for (int i = 1; i < block_width; ++i)
+            send[i - 1] = grid[i][block_width];
+        MPI_Send(send, block_width - 1, MPI_CXX_BOOL, 0, 3, MPI_COMM_WORLD);
+
+        // top-right corner
+        MPI_Send(&grid[1][GRID_SIZE - 2], 1, MPI_CXX_BOOL, 2, 0, MPI_COMM_WORLD);
+        MPI_Recv(&grid[0][GRID_SIZE - 1], 1, MPI_CXX_BOOL, 2, 0, MPI_COMM_WORLD, nullptr);
+
+        // top
+        MPI_Send(&grid[1][block_width], block_width - 1, MPI_CXX_BOOL, 3, 1, MPI_COMM_WORLD);
+        MPI_Recv(&grid[0][block_width], block_width - 1, MPI_CXX_BOOL, 3, 1, MPI_COMM_WORLD, nullptr);
+
+
         // bottom
         MPI_Send(&grid[block_width - 1][block_width], block_width - 1, MPI_CXX_BOOL, 3, 4, MPI_COMM_WORLD);
         MPI_Recv(&grid[block_width][block_width], block_width - 1, MPI_CXX_BOOL, 3, 4, MPI_COMM_WORLD, nullptr);
 
     } else if (rank == 2) {
-        // bottom-left corner
-        MPI_Recv(&grid[GRID_SIZE - 1][0], 1, MPI_CXX_BOOL, 1, 0, MPI_COMM_WORLD, nullptr);
-        MPI_Send(&grid[GRID_SIZE - 2][1], 1, MPI_CXX_BOOL, 1, 0, MPI_COMM_WORLD);
+        bool *send = new bool(block_width - 1);
+        bool *receive = new bool(block_width - 1);
+
+        // bottom
+        MPI_Recv(&grid[GRID_SIZE - 1][1], block_width - 1, MPI_CXX_BOOL, 0, 1, MPI_COMM_WORLD, nullptr);
+        MPI_Send(&grid[GRID_SIZE - 2][1], block_width - 1, MPI_CXX_BOOL, 0, 1, MPI_COMM_WORLD);
 
         // top
         MPI_Recv(&grid[block_width - 1][1], block_width - 1, MPI_CXX_BOOL, 0, 4, MPI_COMM_WORLD, nullptr);
         MPI_Send(&grid[block_width][1], block_width - 1, MPI_CXX_BOOL, 0, 4, MPI_COMM_WORLD);
 
+        // bottom-left corner
+        MPI_Recv(&grid[GRID_SIZE - 1][0], 1, MPI_CXX_BOOL, 1, 0, MPI_COMM_WORLD, nullptr);
+        MPI_Send(&grid[GRID_SIZE - 2][1], 1, MPI_CXX_BOOL, 1, 0, MPI_COMM_WORLD);
+
+
         // left
-        bool *send = new bool(block_width - 1);
-        bool *receive = new bool(block_width - 1);
         for (int i = block_width; i < GRID_SIZE - 1; ++i)
             send[i - 1] = grid[i][1];
         MPI_Send(send, block_width - 1, MPI_CXX_BOOL, 3, 2, MPI_COMM_WORLD);
@@ -113,29 +119,22 @@ void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) 
         for (int i = block_width; i < GRID_SIZE - 1; ++i)
             grid[i][block_width] = receive[i - 1];
 
-        // bottom
-        MPI_Recv(&grid[GRID_SIZE - 1][1], block_width - 1, MPI_CXX_BOOL, 0, 1, MPI_COMM_WORLD, nullptr);
-        MPI_Send(&grid[GRID_SIZE - 2][1], block_width - 1, MPI_CXX_BOOL, 0, 1, MPI_COMM_WORLD);
 
     } else if (rank == 3) {
+        bool *send = new bool(block_width - 1);
+        bool *receive = new bool(block_width - 1);
+
         // bottom-right corner
-        MPI_Recv(&grid[GRID_SIZE - 1][GRID_SIZE - 1], 1, MPI_CXX_BOOL, 3, 0, MPI_COMM_WORLD, nullptr);
-        MPI_Send(&grid[GRID_SIZE - 2][GRID_SIZE - 2], 1, MPI_CXX_BOOL, 3, 0, MPI_COMM_WORLD);
+        MPI_Recv(&grid[GRID_SIZE - 1][GRID_SIZE - 1], 1, MPI_CXX_BOOL, 0, 0, MPI_COMM_WORLD, nullptr);
+        MPI_Send(&grid[GRID_SIZE - 2][GRID_SIZE - 2], 1, MPI_CXX_BOOL, 0, 0, MPI_COMM_WORLD);
+
+        // bottom
+        MPI_Recv(&grid[GRID_SIZE - 1][block_width], block_width - 1, MPI_CXX_BOOL, 1, 1, MPI_COMM_WORLD, nullptr);
+        MPI_Send(&grid[GRID_SIZE - 2][block_width], block_width - 1, MPI_CXX_BOOL, 1, 1, MPI_COMM_WORLD);
 
         // top
         MPI_Recv(&grid[block_width - 1][block_width], block_width - 1, MPI_CXX_BOOL, 1, 4, MPI_COMM_WORLD, nullptr);
         MPI_Send(&grid[block_width][block_width], block_width - 1, MPI_CXX_BOOL, 1, 4, MPI_COMM_WORLD);
-
-        // left
-        bool *send = new bool(block_width - 1);
-        bool *receive = new bool(block_width - 1);
-
-        MPI_Recv(receive, block_width - 1, MPI_CXX_BOOL, 2, 3, MPI_COMM_WORLD, nullptr);
-        for (int i = block_width; i < GRID_SIZE - 1; ++i)
-            grid[i][block_width - 1] = receive[i - 1];
-        for (int i = block_width; i < GRID_SIZE - 1; ++i)
-            send[i - 1] = grid[i][block_width];
-        MPI_Send(send, block_width - 1, MPI_CXX_BOOL, 2, 3, MPI_COMM_WORLD);
 
         // right
         MPI_Recv(receive, block_width - 1, MPI_CXX_BOOL, 2, 2, MPI_COMM_WORLD, nullptr);
@@ -145,20 +144,23 @@ void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) 
             send[i - 1] = grid[i][GRID_SIZE - 2];
         MPI_Send(send, block_width - 1, MPI_CXX_BOOL, 2, 2, MPI_COMM_WORLD);
 
-        // bottom
-        MPI_Recv(&grid[GRID_SIZE - 1][block_width], block_width - 1, MPI_CXX_BOOL, 3, 1, MPI_COMM_WORLD, nullptr);
-        MPI_Send(&grid[GRID_SIZE - 2][block_width], block_width - 1, MPI_CXX_BOOL, 3, 1, MPI_COMM_WORLD);
+        // left
+        MPI_Recv(receive, block_width - 1, MPI_CXX_BOOL, 2, 3, MPI_COMM_WORLD, nullptr);
+        for (int i = block_width; i < GRID_SIZE - 1; ++i)
+            grid[i][block_width - 1] = receive[i - 1];
+        for (int i = block_width; i < GRID_SIZE - 1; ++i)
+            send[i - 1] = grid[i][block_width];
+        MPI_Send(send, block_width - 1, MPI_CXX_BOOL, 2, 3, MPI_COMM_WORLD);
 
         delete send;
         delete receive;
     }
+
     // For each cell
     for (int i = std::max(1, (rank % sqrt_size) * block_width);
          i < std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width); i++) {
         for (int j = std::max(1, (rank / sqrt_size) * block_width);
              j < std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width); j++) {
-            if (rank == 1)
-                std::cout << i << " " << j << std::endl;
             // Calculate the number of neighbors
             int sum = grid[i - 1][j - 1] + grid[i - 1][j] + grid[i - 1][j + 1] +
                       grid[i][j - 1] + grid[i][j + 1] +
@@ -267,16 +269,25 @@ int main(int argc, char **argv) {
             /** might be possible to send the local _sum info to one process, since MPI_send is blocking
              * or apply MPI_Isend(Non-blocking) to store this info of each process in one process and printed
              * by that process */
-            int local_sum = count_alive(*problemData, rank, block_width, sqrt_size);
+            int sum = count_alive(*problemData, rank, block_width, sqrt_size);
             if (rank == 3) {
-                int *sums = new int(3);
-                for (int i = 0; i < 3; ++i) {
-                    MPI_Recv(sums + i, 1, MPI_INT, i, 5, MPI_COMM_WORLD, nullptr);
-                    local_sum += *(sums + i);
-                }
-                std::cout << "Iteration " << iteration << ": " << local_sum << " cells alive." << std::endl;
-            } else
-                MPI_Send(&local_sum, 1, MPI_INT, 3, 5, MPI_COMM_WORLD);
+                int sum_prev;
+                MPI_Recv(&sum_prev, 1, MPI_INT, 2, 5, MPI_COMM_WORLD, nullptr);
+                sum += sum_prev;
+                std::cout << "Iteration " << iteration << ": " << sum << " cells alive." << std::endl;
+            } else if (rank == 2) {
+                int sum_prev;
+                MPI_Recv(&sum_prev, 1, MPI_INT, 1, 5, MPI_COMM_WORLD, nullptr);
+                sum += sum_prev;
+                MPI_Send(&sum, 1, MPI_INT, 3, 5, MPI_COMM_WORLD);
+            } else if (rank == 1) {
+                int sum_prev;
+                MPI_Recv(&sum_prev, 1, MPI_INT, 0, 5, MPI_COMM_WORLD, nullptr);
+                sum += sum_prev;
+                MPI_Send(&sum, 1, MPI_INT, 2, 5, MPI_COMM_WORLD);
+            } else if (rank == 0) {
+                MPI_Send(&sum, 1, MPI_INT, 1, 5, MPI_COMM_WORLD);
+            }
 
         }
 
