@@ -52,6 +52,16 @@ void evolve(ProblemData& problemData) {
     }
 }
 
+void print_problem(ProblemData* problem) {
+    for (int i = 0; i < GRID_SIZE - 1; ++i) {
+        for (int j = 0; j < GRID_SIZE - 1; ++j) {
+            if (*problem->readGrid[i][j])
+                printf("[%d][%d] ", i, j);
+        }
+        printf("\n");
+    }
+}
+
 /*
   Copies data from the inner part of the grid to
   shadow (padding) rows and columns to transform the grid into a torus.
@@ -100,20 +110,16 @@ int main(int argc, char** argv) {
 
     // As with Jack Sparrow's exercise, this needs FFMPEG (new and improved: this now works with more video players).
     // As an alternative, you can write individual png files to take a look at the data.
-    if (activateVideoOutput) {
-        VideoOutput::beginVideoOutput();
-        VideoOutput::saveToFile(*problemData->readGrid, "grid_beginning.png");
-    }
+
 
     Utility::readProblemFromInput(CODE_VERSION, *problemData);
 
     //TODO@Students: This is the main simulation. Parallelize it using MPI.
     for (int iteration = 0; iteration < NUM_SIMULATION_STEPS; ++iteration) {
+        if (iteration == 0)
+            print_problem(problemData);
         copy_edges(*problemData->readGrid);
 
-        if (activateVideoOutput) {
-            VideoOutput::writeVideoFrames(*problemData);
-        }
 
         if (iteration % SOLUTION_REPORT_INTERVAL == 0) {
             Utility::outputIntermediateSolution(iteration, *problemData);
@@ -125,11 +131,6 @@ int main(int argc, char** argv) {
     }
 
     Utility::outputSolution(*problemData);
-
-    if (activateVideoOutput) {
-        VideoOutput::endVideoOutput();
-        VideoOutput::saveToFile(*problemData->readGrid, "grid_final.png");
-    }
 
     delete problemData;
     }

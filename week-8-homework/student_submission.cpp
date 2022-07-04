@@ -130,6 +130,8 @@ void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) 
             MPI_Recv(&grid[GRID_SIZE - 1][GRID_SIZE - 1], 1, MPI_CXX_BOOL, 0, 4, MPI_COMM_WORLD, nullptr);
             MPI_Send(&grid[GRID_SIZE - 2][GRID_SIZE - 2], 1, MPI_CXX_BOOL, 0, 4, MPI_COMM_WORLD);
         }
+
+        /** / */
         if (rank == sqrt_size - 1) {
             MPI_Send(&grid[1][GRID_SIZE - 2], 1, MPI_CXX_BOOL, pow(sqrt_size, 2) - sqrt_size, 4, MPI_COMM_WORLD);
             MPI_Recv(&grid[0][GRID_SIZE - 1], 1, MPI_CXX_BOOL, pow(sqrt_size, 2) - sqrt_size, 4, MPI_COMM_WORLD, nullptr);
@@ -212,6 +214,17 @@ int count_alive(ProblemData &data, int rank, int block_width, int sqrt_size) {
     return counter;
 }
 
+void print_block(ProblemData* problemData, int block_width, int rank, int sqrt_size) {
+    printf("rank: %d\n", rank);
+    for (int i = (rank % sqrt_size) * block_width; i < (rank % sqrt_size + 1) * block_width; ++i) {
+        for (int j = (rank % sqrt_size) * block_width; j < (rank % sqrt_size + 1) * block_width; ++j) {
+            if (*problemData->readGrid[i][j])
+                printf("[%d][%d] ", i, j);
+        }
+        printf("\n");
+    }
+}
+
 int main(int argc, char **argv) {
     bool activateVideoOutput = false;
     if (argc > 1) {
@@ -249,36 +262,36 @@ int main(int argc, char **argv) {
 //           std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width));
 
     //TODO@Students: This is the main simulation. Parallelize it using MPI.
-    for (int iteration = 0; iteration < NUM_SIMULATION_STEPS; ++iteration) {
-
-        if (iteration % SOLUTION_REPORT_INTERVAL == 0) {
+    for (int iteration = 0; iteration <= NUM_SIMULATION_STEPS; ++iteration) {
+//        if (iteration == 0)
+//            print_block(problemData, block_width, rank, sqrt_size);
+        if (iteration % SOLUTION_REPORT_INTERVAL == 0 || iteration == NUM_SIMULATION_STEPS) {
             int sum = count_alive(*problemData, rank, block_width, sqrt_size);
-            if (rank == 3) {
-                int sum_prev;
-                MPI_Recv(&sum_prev, 1, MPI_INT, 2, 5, MPI_COMM_WORLD, nullptr);
+            int sum_prev;
+
+            int des = rank + 1;
+            int source = rank - 1;
+            if (rank == 0)
+                MPI_Send(&sum, 1, MPI_INT, des, 5, MPI_COMM_WORLD);
+            else if (rank == size - 1) {
+                MPI_Recv(&sum_prev, 1, MPI_INT, source, 5, MPI_COMM_WORLD, nullptr);
                 sum += sum_prev;
                 std::cout << "Iteration " << iteration << ": " << sum << " cells alive." << std::endl;
-            } else if (rank == 2) {
-                int sum_prev;
-                MPI_Recv(&sum_prev, 1, MPI_INT, 1, 5, MPI_COMM_WORLD, nullptr);
-                sum += sum_prev;
-                MPI_Send(&sum, 1, MPI_INT, 3, 5, MPI_COMM_WORLD);
-            } else if (rank == 1) {
-                int sum_prev;
-                MPI_Recv(&sum_prev, 1, MPI_INT, 0, 5, MPI_COMM_WORLD, nullptr);
-                sum += sum_prev;
-                MPI_Send(&sum, 1, MPI_INT, 2, 5, MPI_COMM_WORLD);
-            } else if (rank == 0) {
-                MPI_Send(&sum, 1, MPI_INT, 1, 5, MPI_COMM_WORLD);
             }
+            else {
+                MPI_Recv(&sum_prev, 1, MPI_INT, source, 5, MPI_COMM_WORLD, nullptr);
+                sum += sum_prev;
+                MPI_Send(&sum, 1, MPI_INT, des, 5, MPI_COMM_WORLD);
+            }
+
         }
+        if (iteration == NUM_SIMULATION_STEPS)
+            break;
 
         evolve(*problemData, rank, block_width, sqrt_size);
 
         problemData->swapGrids();
     }
-
-    Utility::outputSolution(*problemData);
 
     if (activateVideoOutput) {
         VideoOutput::endVideoOutput();
