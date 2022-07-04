@@ -32,7 +32,7 @@ void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) 
         int index = 0;
         for (int y = std::max(1, (rank / sqrt_size) * block_width);
              y < std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width); ++y) {
-            send[index] = grid[std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width) - 1][y];
+            send[index] = grid[y][std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width) - 1];
             index++;
         }
         int des = rank + 1;
@@ -50,7 +50,7 @@ void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) 
         index = 0;
         for (int y = std::max(1, (rank / sqrt_size) * block_width);
              y < std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width); ++y) {
-            grid[std::max(1, (rank % sqrt_size) * block_width) - 1][y] = receive[index];
+            grid[y][std::max(1, (rank % sqrt_size) * block_width) - 1] = receive[index];
             index++;
         }
 
@@ -58,7 +58,7 @@ void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) 
         index = 0;
         for (int y = std::max(1, (rank / sqrt_size) * block_width);
              y < std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width); ++y) {
-            send[index] = grid[std::max(1, (rank % sqrt_size) * block_width)][y];
+            send[index] = grid[y][std::max(1, (rank % sqrt_size) * block_width)];
             index++;
         }
         source = rank + 1;
@@ -76,7 +76,7 @@ void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) 
         index = 0;
         for (int y = std::max(1, (rank / sqrt_size) * block_width);
              y < std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width); ++y) {
-            grid[std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width) - 1][y] = receive[index];
+            grid[y][std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width)] = receive[index];
             index++;
         }
         free(send);
@@ -95,9 +95,9 @@ void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) 
         int size = std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width) -
                    std::max(1, (rank / sqrt_size) * block_width);
 
-        MPI_Sendrecv(&grid[std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width) - 1][std::max(1, (rank / sqrt_size) * block_width)],
+        MPI_Sendrecv(&grid[std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width) - 1][std::max(1, (rank % sqrt_size) * block_width)],
                      size, MPI_CXX_BOOL, des, 2,
-                     &grid[std::max(1, (rank / sqrt_size) * block_width) - 1][std::max(1, (rank / sqrt_size) * block_width)],
+                     &grid[std::max(1, (rank / sqrt_size) * block_width) - 1][std::max(1, (rank % sqrt_size) * block_width)],
                      size, MPI_CXX_BOOL, source, 2,
                      MPI_COMM_WORLD, &status);
 
@@ -111,9 +111,9 @@ void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) 
         size = std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width) -
                    std::max(1, (rank / sqrt_size) * block_width);
 
-        MPI_Sendrecv(&grid[std::max(1, (rank / sqrt_size) * block_width)][std::max(1, (rank / sqrt_size) * block_width)],
+        MPI_Sendrecv(&grid[std::max(1, (rank / sqrt_size) * block_width)][std::max(1, (rank % sqrt_size) * block_width)],
                      size, MPI_CXX_BOOL, des, 3,
-                     &grid[std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width)][std::max(1, (rank / sqrt_size) * block_width)],
+                     &grid[std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width)][std::max(1, (rank % sqrt_size) * block_width)],
                      size, MPI_CXX_BOOL, source, 3,
                      MPI_COMM_WORLD, &status);
     }
@@ -256,10 +256,12 @@ int main(int argc, char **argv) {
 
     Utility::readProblemFromInput(CODE_VERSION, *problemData);
 
-//    printf("rank: %d, x: %d-%d, y: %d-%d\n", rank, std::max(1, (rank % sqrt_size) * block_width),
-//           std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width),
+//    printf("rank: %d, x: %d-%d, y: %d-%d\n", rank,
 //           std::max(1, (rank / sqrt_size) * block_width),
-//           std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width));
+//           std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width),
+//
+//           std::max(1, (rank % sqrt_size) * block_width),
+//           std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width));
 
     //TODO@Students: This is the main simulation. Parallelize it using MPI.
     for (int iteration = 0; iteration <= NUM_SIMULATION_STEPS; ++iteration) {

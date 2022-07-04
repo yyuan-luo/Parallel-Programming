@@ -116,8 +116,7 @@ int main(int argc, char** argv) {
 
     //TODO@Students: This is the main simulation. Parallelize it using MPI.
     for (int iteration = 0; iteration < NUM_SIMULATION_STEPS; ++iteration) {
-        if (iteration == 0)
-            print_problem(problemData);
+
         copy_edges(*problemData->readGrid);
 
 
