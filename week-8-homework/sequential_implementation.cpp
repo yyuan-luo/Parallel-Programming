@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
+#include <unistd.h>
 #include "life.h"
 #include "Utility.h"
 #include "VideoOutput.h"

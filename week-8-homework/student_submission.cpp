@@ -11,6 +11,7 @@
 #include <math.h>
 #include <iostream>
 #include <random>
+#include <unistd.h>
 
 #define CODE_VERSION 1
 
@@ -32,6 +33,15 @@ inline bool generate_bit() {
     return value;
 }
 
+int compare_buff(bool *send, bool *receive) {
+    for (int i = 0; i < 751; ++i) {
+        if (send[i] != receive[i]) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 /*
   Apply the game of life rules on a Torus --> grid contains shadow rows and columns
   to simplify application of rules i.e. grid actually ranges from grid [ 1.. height - 2 ][ 1 .. width - 2]
@@ -48,9 +58,9 @@ void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) 
 
         // send to right, receive from left
         int index = 0;
-        for (int y = std::max(1, (rank / sqrt_size) * block_width);
-             y < std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width); ++y) {
-            send[index] = grid[y][std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width) - 1];
+        for (int x = std::max(1, (rank / sqrt_size) * block_width);
+             x < std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width); ++x) {
+            send[index] = grid[x][std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width) - 1];
             index++;
         }
         int des = rank + 1;
@@ -66,17 +76,17 @@ void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) 
                      receive, size, MPI_CXX_BOOL, source, 0,
                      MPI_COMM_WORLD, &status);
         index = 0;
-        for (int y = std::max(1, (rank / sqrt_size) * block_width);
-             y < std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width); ++y) {
-            grid[y][std::max(1, (rank % sqrt_size) * block_width) - 1] = receive[index];
+        for (int x = std::max(1, (rank / sqrt_size) * block_width);
+             x < std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width); ++x) {
+            grid[x][std::max(1, (rank % sqrt_size) * block_width) - 1] = receive[index];
             index++;
         }
 
         // send to left, receive from right
         index = 0;
-        for (int y = std::max(1, (rank / sqrt_size) * block_width);
-             y < std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width); ++y) {
-            send[index] = grid[y][std::max(1, (rank % sqrt_size) * block_width)];
+        for (int x = std::max(1, (rank / sqrt_size) * block_width);
+             x < std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width); ++x) {
+            send[index] = grid[x][std::max(1, (rank % sqrt_size) * block_width)];
             index++;
         }
         source = rank + 1;
@@ -92,9 +102,9 @@ void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) 
                      receive, size, MPI_CXX_BOOL, source, 1,
                      MPI_COMM_WORLD, &status);
         index = 0;
-        for (int y = std::max(1, (rank / sqrt_size) * block_width);
-             y < std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width); ++y) {
-            grid[y][std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width)] = receive[index];
+        for (int x = std::max(1, (rank / sqrt_size) * block_width);
+             x < std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width); ++x) {
+            grid[x][std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width)] = receive[index];
             index++;
         }
         free(send);
@@ -161,10 +171,10 @@ void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) 
     }
 
     // For each cell
-    for (int i = std::max(1, (rank % sqrt_size) * block_width);
-         i < std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width); i++) {
-        for (int j = std::max(1, (rank / sqrt_size) * block_width);
-             j < std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width); j++) {
+    for (int i = std::max(1, (rank / sqrt_size) * block_width);
+         i < std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width); i++) {
+        for (int j = std::max(1, (rank % sqrt_size) * block_width);
+             j < std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width); j++) {
             // Calculate the number of neighbors
             int sum = grid[i - 1][j - 1] + grid[i - 1][j] + grid[i - 1][j + 1] +
                       grid[i][j - 1] + grid[i][j + 1] +
@@ -220,22 +230,22 @@ void copy_edges(bool(&grid)[GRID_SIZE][GRID_SIZE]) {
 int count_alive(ProblemData &data, int rank, int block_width, int sqrt_size) {
     auto &grid = *data.readGrid;
     int counter = 0;
-    for (int x = std::max(1, (rank % sqrt_size) * block_width);
-         x < std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width); x++) {
-        for (int y = std::max(1, (rank / sqrt_size) * block_width);
-             y < std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width); y++) {
-            if (grid[x][y]) {
+    for (int i = std::max(1, (rank / sqrt_size) * block_width);
+         i < std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width); i++)
+        for (int j = std::max(1, (rank % sqrt_size) * block_width);
+             j < std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width); j++) {
+            if (grid[i][j])
                 counter++;
-            }
         }
-    }
     return counter;
 }
 
 void print_block(ProblemData* problemData, int block_width, int rank, int sqrt_size) {
     printf("rank: %d\n", rank);
-    for (int i = (rank % sqrt_size) * block_width; i < (rank % sqrt_size + 1) * block_width; ++i) {
-        for (int j = (rank % sqrt_size) * block_width; j < (rank % sqrt_size + 1) * block_width; ++j) {
+    for (int i = std::max(1, (rank / sqrt_size) * block_width);
+         i < std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width); i++) {
+        for (int j = std::max(1, (rank % sqrt_size) * block_width);
+             j < std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width); j++) {
             if (*problemData->readGrid[i][j])
                 printf("[%d][%d] ", i, j);
         }
@@ -291,12 +301,12 @@ int main(int argc, char **argv) {
         *(grid[0] + i) = generate_bit();
     }
 
-//    printf("rank: %d, x: %d-%d, y: %d-%d\n", rank,
-//           std::max(1, (rank / sqrt_size) * block_width),
-//           std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width),
-//
-//           std::max(1, (rank % sqrt_size) * block_width),
-//           std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width));
+    printf("rank: %d, x: %d-%d, y: %d-%d\n", rank,
+           std::max(1, (rank / sqrt_size) * block_width),
+           std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width),
+
+           std::max(1, (rank % sqrt_size) * block_width),
+           std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width));
 
     //TODO@Students: This is the main simulation. Parallelize it using MPI.
     for (int iteration = 0; iteration <= NUM_SIMULATION_STEPS; ++iteration) {
