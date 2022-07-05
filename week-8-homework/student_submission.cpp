@@ -6,13 +6,31 @@
 #include <cstdio>
 #include <cstring>
 #include "life.h"
-#include "Utility.h"
 #include "VideoOutput.h"
 #include <mpi.h>
 #include <math.h>
 #include <iostream>
+#include <random>
 
 #define CODE_VERSION 1
+
+std::minstd_rand random_engine;
+uint_fast32_t cached_value;
+uint_fast32_t bit_mask = 0;
+
+void seed_generator(unsigned long long seed) {
+    random_engine = std::minstd_rand(seed);
+}
+
+inline bool generate_bit() {
+    if (!bit_mask) {
+        cached_value = random_engine();
+        bit_mask = 1;
+    }
+    bool value = cached_value & bit_mask;
+    bit_mask = bit_mask << 1;
+    return value;
+}
 
 /*
   Apply the game of life rules on a Torus --> grid contains shadow rows and columns
@@ -235,6 +253,10 @@ int main(int argc, char **argv) {
             exit(153);
         }
     }
+
+    auto *problemData = new ProblemData;
+    auto& grid = *problemData->readGrid;
+
     MPI_Init(&argc, &argv);
     int size, rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -242,8 +264,6 @@ int main(int argc, char **argv) {
 
     int sqrt_size = sqrt(size);
     int block_width = GRID_SIZE / sqrt_size;
-
-    auto *problemData = new ProblemData;
 
 //    copy_edges(*problemData->readGrid);
 
@@ -254,7 +274,22 @@ int main(int argc, char **argv) {
         VideoOutput::saveToFile(*problemData->readGrid, "grid_beginning.png");
     }
 
-    Utility::readProblemFromInput(CODE_VERSION, *problemData);
+    unsigned int seed = 0;
+    if (rank  == 0) {
+        std::cout << "READY" << std::endl;
+        std::cin >> seed;
+
+        std::cout << "Using seed " << seed << std::endl;
+        if (seed == 0) {
+            std::cout << "Warning: default value 0 used as seed." << std::endl;
+        }
+    }
+    MPI_Bcast(&seed, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    seed_generator(seed);
+
+    for (int i = 0; i < GRID_SIZE * GRID_SIZE; i += 1) {
+        *(grid[0] + i) = generate_bit();
+    }
 
 //    printf("rank: %d, x: %d-%d, y: %d-%d\n", rank,
 //           std::max(1, (rank / sqrt_size) * block_width),
