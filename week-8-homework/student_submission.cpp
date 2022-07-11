@@ -33,20 +33,11 @@ inline bool generate_bit() {
     return value;
 }
 
-int compare_buff(bool *send, bool *receive) {
-    for (int i = 0; i < 751; ++i) {
-        if (send[i] != receive[i]) {
-            return 0;
-        }
-    }
-    return 1;
-}
-
 /*
   Apply the game of life rules on a Torus --> grid contains shadow rows and columns
   to simplify application of rules i.e. grid actually ranges from grid [ 1.. height - 2 ][ 1 .. width - 2]
 */
-void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) {
+void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size, int size) {
     auto &grid = *problemData.readGrid;
     auto &writeGrid = *problemData.writeGrid;
     MPI_Status status;
@@ -69,11 +60,11 @@ void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) 
             des = ((rank + 1) / sqrt_size - 1) * sqrt_size;
         if (rank % sqrt_size == 0)  // leftmost block
             source = ((rank / sqrt_size) + 1) * sqrt_size - 1;
-        int size = std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width) -
+        int buff_size = std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width) -
                    std::max(1, (rank / sqrt_size) * block_width);
 
-        MPI_Sendrecv(send, size, MPI_CXX_BOOL, des, 0,
-                     receive, size, MPI_CXX_BOOL, source, 0,
+        MPI_Sendrecv(send, buff_size, MPI_CXX_BOOL, des, 0,
+                     receive, buff_size, MPI_CXX_BOOL, source, 0,
                      MPI_COMM_WORLD, &status);
         index = 0;
         for (int x = std::max(1, (rank / sqrt_size) * block_width);
@@ -95,11 +86,11 @@ void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) 
             source = ((rank + 1) / sqrt_size - 1) * sqrt_size;
         if (rank % sqrt_size == 0)  // leftmost block
             des = ((rank / sqrt_size) + 1) * sqrt_size - 1;
-        size = std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width) -
+        buff_size = std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width) -
                    std::max(1, (rank / sqrt_size) * block_width);
 
-        MPI_Sendrecv(send, size, MPI_CXX_BOOL, des, 1,
-                     receive, size, MPI_CXX_BOOL, source, 1,
+        MPI_Sendrecv(send, buff_size, MPI_CXX_BOOL, des, 1,
+                     receive, buff_size, MPI_CXX_BOOL, source, 1,
                      MPI_COMM_WORLD, &status);
         index = 0;
         for (int x = std::max(1, (rank / sqrt_size) * block_width);
@@ -116,33 +107,33 @@ void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) 
         // send to bottom, receive from bottom
         int des = rank + sqrt_size;
         int source = rank - sqrt_size;
-        if (des >= pow(sqrt_size, 2))    // bottommost block
-            des = des - pow(sqrt_size, 2);
+        if (des >= size)    // bottommost block
+            des = des - size;
         if (source < 0)                     // topmost block
-            source = pow(sqrt_size, 2) + source;
-        int size = std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width) -
+            source = size + source;
+        int buff_size = std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width) -
                    std::max(1, (rank / sqrt_size) * block_width);
 
         MPI_Sendrecv(&grid[std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width) - 1][std::max(1, (rank % sqrt_size) * block_width)],
-                     size, MPI_CXX_BOOL, des, 2,
+                     buff_size, MPI_CXX_BOOL, des, 2,
                      &grid[std::max(1, (rank / sqrt_size) * block_width) - 1][std::max(1, (rank % sqrt_size) * block_width)],
-                     size, MPI_CXX_BOOL, source, 2,
+                     buff_size, MPI_CXX_BOOL, source, 2,
                      MPI_COMM_WORLD, &status);
 
         // send to top, receive from bottom
         des = rank - sqrt_size;
         source = rank + sqrt_size;
-        if (source >= pow(sqrt_size, 2))    // bottommost block
-            source = source - pow(sqrt_size, 2);
+        if (source >= size)    // bottommost block
+            source = source - size;
         if (des < 0)                     // topmost block
-            des = pow(sqrt_size, 2) + des;
-        size = std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width) -
+            des = size + des;
+        buff_size = std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width) -
                    std::max(1, (rank / sqrt_size) * block_width);
 
         MPI_Sendrecv(&grid[std::max(1, (rank / sqrt_size) * block_width)][std::max(1, (rank % sqrt_size) * block_width)],
-                     size, MPI_CXX_BOOL, des, 3,
+                     buff_size, MPI_CXX_BOOL, des, 3,
                      &grid[std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width)][std::max(1, (rank % sqrt_size) * block_width)],
-                     size, MPI_CXX_BOOL, source, 3,
+                     buff_size, MPI_CXX_BOOL, source, 3,
                      MPI_COMM_WORLD, &status);
     }
 
@@ -151,8 +142,8 @@ void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) 
         /** \ */
         if (rank == 0) {
             MPI_Send(&grid[1][1], 1, MPI_CXX_BOOL,
-                     pow(sqrt_size, 2) - 1, 4, MPI_COMM_WORLD);
-            MPI_Recv(&grid[0][0], 1, MPI_CXX_BOOL, pow(sqrt_size, 2) - 1, 4, MPI_COMM_WORLD, nullptr);
+                     size - 1, 4, MPI_COMM_WORLD);
+            MPI_Recv(&grid[0][0], 1, MPI_CXX_BOOL, size - 1, 4, MPI_COMM_WORLD, nullptr);
         }
         if (rank == pow(sqrt_size, 2) - 1) {
             MPI_Recv(&grid[GRID_SIZE - 1][GRID_SIZE - 1], 1, MPI_CXX_BOOL, 0, 4, MPI_COMM_WORLD, nullptr);
@@ -161,8 +152,8 @@ void evolve(ProblemData &problemData, int rank, int block_width, int sqrt_size) 
 
         /** / */
         if (rank == sqrt_size - 1) {
-            MPI_Send(&grid[1][GRID_SIZE - 2], 1, MPI_CXX_BOOL, pow(sqrt_size, 2) - sqrt_size, 4, MPI_COMM_WORLD);
-            MPI_Recv(&grid[0][GRID_SIZE - 1], 1, MPI_CXX_BOOL, pow(sqrt_size, 2) - sqrt_size, 4, MPI_COMM_WORLD, nullptr);
+            MPI_Send(&grid[1][GRID_SIZE - 2], 1, MPI_CXX_BOOL, size - sqrt_size, 4, MPI_COMM_WORLD);
+            MPI_Recv(&grid[0][GRID_SIZE - 1], 1, MPI_CXX_BOOL, size - sqrt_size, 4, MPI_COMM_WORLD, nullptr);
         }
         if (rank == pow(sqrt_size, 2) - sqrt_size) {
             MPI_Recv(&grid[GRID_SIZE - 1][0], 1, MPI_CXX_BOOL, sqrt_size - 1, 4, MPI_COMM_WORLD, nullptr);
@@ -271,7 +262,6 @@ int main(int argc, char **argv) {
     int size, rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
-
     int sqrt_size = sqrt(size);
     int block_width = GRID_SIZE / sqrt_size;
 
@@ -301,12 +291,12 @@ int main(int argc, char **argv) {
         *(grid[0] + i) = generate_bit();
     }
 
-    printf("rank: %d, x: %d-%d, y: %d-%d\n", rank,
-           std::max(1, (rank / sqrt_size) * block_width),
-           std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width),
-
-           std::max(1, (rank % sqrt_size) * block_width),
-           std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width));
+//    printf("rank: %d, x: %d-%d, y: %d-%d\n", rank,
+//           std::max(1, (rank / sqrt_size) * block_width),
+//           std::min(GRID_SIZE - 1, (rank / sqrt_size + 1) * block_width),
+//
+//           std::max(1, (rank % sqrt_size) * block_width),
+//           std::min(GRID_SIZE - 1, (rank % sqrt_size + 1) * block_width));
 
     //TODO@Students: This is the main simulation. Parallelize it using MPI.
     for (int iteration = 0; iteration <= NUM_SIMULATION_STEPS; ++iteration) {
@@ -335,7 +325,7 @@ int main(int argc, char **argv) {
         if (iteration == NUM_SIMULATION_STEPS)
             break;
 
-        evolve(*problemData, rank, block_width, sqrt_size);
+        evolve(*problemData, rank, block_width, sqrt_size, size);
 
         problemData->swapGrids();
     }
