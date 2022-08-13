@@ -78,6 +78,7 @@ working_thread(int thread_id, const std::vector <Sphere> &spheres, int *image_da
     // Calculating the aspect ratio and creating the camera for the rendering
     const auto aspect_ratio = (float) WIDTH / HEIGHT;
     Camera camera(Vector3(0, 1, 1), Vector3(0, 0, -1), Vector3(0, 1, 0), aspect_ratio, 90, 0.0f, 1.5f);
+    Checksum local_checksum(0, 0, 0);
 
     for (int y = 0; y < HEIGHT; ++y) {
         for (int x = interval * thread_id; x < interval * (thread_id + 1); x++) {
@@ -88,10 +89,7 @@ working_thread(int thread_id, const std::vector <Sphere> &spheres, int *image_da
                 auto r = get_camera_ray(camera, u, v);
                 pixel_color += trace_ray(r, spheres, DEPTH);
             }
-
-            mutex.lock();
-            auto output_color = write_color(checksum, pixel_color, NUM_SAMPLES);
-            mutex.unlock();
+            auto output_color = write_color(local_checksum, pixel_color, NUM_SAMPLES);
 
             int pos = ((HEIGHT - 1 - y) * WIDTH + x) * 3;
             image_data[pos] = output_color.r;
@@ -99,6 +97,9 @@ working_thread(int thread_id, const std::vector <Sphere> &spheres, int *image_da
             image_data[pos + 2] = output_color.b;
         }
     }
+    mutex.lock();
+    checksum += local_checksum;
+    mutex.unlock();
 }
 
 int main(int argc, char **argv) {

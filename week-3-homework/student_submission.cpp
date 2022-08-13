@@ -97,7 +97,7 @@ int main(int argc, char **argv)
     int x_resolution = 1511;
     int y_resolution = 1511;
     int palette_shift = 0;
-    char file_name[256] = "mandelbrot.ppm";
+    char file_name[256] = "mandelbrot_1.ppm";
     int no_output = 0;
 
     double x_stepsize;
@@ -142,7 +142,7 @@ int main(int argc, char **argv)
                     "-n \t no output(default: 0)\n"
                     "\n"
                     "Example:\n"
-                    "%s -r 720x480 -i 5000 -f mandelbrot.ppm\n",
+                    "%s -r 720x480 -i 5000 -f mandelbrot_1.ppm\n",
                     argv[0]);
             exit(EXIT_FAILURE);
             break;
