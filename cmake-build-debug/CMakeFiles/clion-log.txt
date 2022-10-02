@@ -1,1 +1,1 @@
-CMakeLists.txt not found in /home/yuan/tum/parallel-programming/Parallel-Programming Select CMakeLists.txt
+CMakeLists.txt not found in /home/parallels/Projects/parallel_programming/Parallel-Programming Select CMakeLists.txt

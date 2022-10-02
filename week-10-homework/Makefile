@@ -20,7 +20,7 @@ env_file: student_submission.cpp
 	sed -n -e 's/.*!submission_env \(.*\)/\1/p' student_submission.cpp > student_submission.env
 
 mpirun_options: student_submission.cpp
-	sed -n -E -e 's/.*!mpirun_option ((--bind-to|--map-by|--rank-by)\s\S+).*/\1/p' student_submission.cpp > student_mpirun.opt
+	sed -n -E -e 's/.*!mpirun_option ((--map-bt socket:PE=4 --bind-to core)\s\S+).*/\1/p' student_submission.cpp > student_mpirun.opt
 
 clean:
 	rm -f sequential_implementation student_submission Utility.o student_submission.env student_mpirun.opt
